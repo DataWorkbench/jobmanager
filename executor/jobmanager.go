@@ -27,8 +27,9 @@ const (
 	JobDepends = "depends" //run second
 	JobMainrun = "mainrun" //run third
 
-	FlinkJobSsql = "ssql"
-	FlinkJobJar  = "jar"
+	FlinkJobSsql       = "ssql"
+	FlinkJobJar        = "jar"
+	MaxStatusFailedNum = 100
 )
 
 type JobmanagerInfo struct {
@@ -50,13 +51,14 @@ type JobWatchInfo struct {
 }
 
 type jobQueueType struct {
-	ID             string
-	NoteID         string
-	RunEnd         bool
-	ParagraphIndex int
-	ParagraphID    string
-	ParagraphIDs   string
-	Resources      string
+	ID              string
+	NoteID          string
+	RunEnd          bool
+	StatusFailedNum int32
+	ParagraphIndex  int
+	ParagraphID     string
+	ParagraphIDs    string
+	Resources       string
 }
 
 func (smi JobmanagerInfo) TableName() string {
@@ -295,6 +297,7 @@ func InitJobInfo(watchInfo JobWatchInfo) (job jobQueueType) {
 	job.ParagraphIDs = watchInfo.ParagraphIDs
 	job.RunEnd = false
 	job.Resources = watchInfo.Resources
+	job.StatusFailedNum = 0
 
 	return
 }
@@ -318,8 +321,16 @@ func (ex *JobmanagerExecutor) WatchJob(ctx context.Context) {
 			for id, job := range jobQueue {
 				for true {
 					if status, err = ex.httpClient.GetParagraphStatus(job.NoteID, job.ParagraphID); err != nil {
-						ex.logger.Error().Msg("can't get this paragraph status").String("noteid", job.NoteID).String("paragraphid", job.ParagraphID).Fire()
-						break
+						job.StatusFailedNum += 1
+						jobQueue[id] = job
+						ex.logger.Error().Msg("can't get this paragraph status").String("noteid", job.NoteID).String("paragraphid", job.ParagraphID).Int32("failednum", job.StatusFailedNum).Fire()
+
+						if job.StatusFailedNum < MaxStatusFailedNum {
+							break
+						} else {
+							status = ParagraphError
+							err = nil
+						}
 					}
 					if status == ParagraphFinish {
 						job = GetNextParagraphID(job)
@@ -331,7 +342,6 @@ func (ex *JobmanagerExecutor) WatchJob(ctx context.Context) {
 
 							if err = ex.httpClient.DeleteNote(job.NoteID); err != nil {
 								ex.logger.Error().Msg("can't delete the job note").String("jobid", job.ID).Fire()
-								break
 							}
 							delete(jobQueue, id)
 							break
@@ -353,10 +363,12 @@ func (ex *JobmanagerExecutor) WatchJob(ctx context.Context) {
 							ex.logger.Error().Msg("can't change the job status to failed").String("jobid", job.ID).Fire()
 							break
 						}
-
-						if err = ex.httpClient.DeleteNote(job.NoteID); err != nil {
-							ex.logger.Error().Msg("can't delete the job note").String("jobid", job.ID).Fire()
-							break
+						if job.StatusFailedNum < MaxStatusFailedNum {
+							if err = ex.httpClient.DeleteNote(job.NoteID); err != nil {
+								ex.logger.Error().Msg("can't delete the job note").String("jobid", job.ID).Fire()
+							}
+						} else {
+							ex.logger.Warn().Msg("don't delete the job note").String("jobid", job.ID).Fire()
 						}
 						delete(jobQueue, id)
 						break
@@ -368,7 +380,6 @@ func (ex *JobmanagerExecutor) WatchJob(ctx context.Context) {
 
 						if err = ex.httpClient.DeleteNote(job.NoteID); err != nil {
 							ex.logger.Error().Msg("can't delete the job note").String("jobid", job.ID).Fire()
-							break
 						}
 						delete(jobQueue, id)
 						break
@@ -413,7 +424,6 @@ func (ex *JobmanagerExecutor) PickupAloneJob(ctx context.Context) {
 
 func (ex *JobmanagerExecutor) GetJobStatus(ctx context.Context, ID string) (rep jobpb.JobReply, err error) {
 	job, tmperr := ex.GetJobInfo(ctx, ID)
-	ex.logger.Warn().Any("", job).Fire()
 
 	if tmperr != nil {
 		err = tmperr
