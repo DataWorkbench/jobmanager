@@ -3,6 +3,7 @@ package executor
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -88,9 +89,19 @@ func GenerateFlinkJob(client SourceClient, flinkHome string, flinkAddr string, n
 			return
 		}
 
-		if _, ok := dependsJson[dependJarArgs]; ok == false {
+		v, ok := dependsJson[dependJarArgs]
+		if ok == false {
 			err = fmt.Errorf("can't find " + dependJarArgs + " in depends")
 			return
+		} else {
+			if len(v) > 0 {
+				var checkv = regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString
+				if checkv(v) == false {
+					err = fmt.Errorf("only [a-zA-Z0-9] is allow in jarargs")
+					return
+				}
+			}
+
 		}
 
 		if _, ok := dependsJson[dependJarEntry]; ok == false {
