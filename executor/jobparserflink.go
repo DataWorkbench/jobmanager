@@ -5,28 +5,12 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/DataWorkbench/common/constants"
 )
 
-const (
-	SourceTypeMysql      = "MySQL"
-	SourceTypePostgreSQL = "PostgreSQL"
-	SourceTypeKafka      = "Kafka"
-	workbenchQuote       = "$qc$"
-
-	dependTable       = "table"
-	dependFunc        = "func"
-	dependParallelism = "parallelism"
-	dependJobCpu      = "jobcpu"
-	dependJobMem      = "jobmem"
-	dependTaskCpu     = "taskcpu"
-	dependTaskMem     = "taskmem"
-	dependTaskNum     = "tasknum"
-	dependJarArgs     = "jarargs"
-	dependJarEntry    = "jarentry"
-)
-
-func GenerateFlinkConf(flinkHome string, flinkExecJars string, engineHost string, enginePort string, nodeType string) (o string) {
-	if nodeType == FlinkJobSsql {
+func GenerateFlinkConf(flinkHome string, flinkExecJars string, engineHost string, enginePort string, nodeType int32) (o string) {
+	if nodeType == constants.NodeTypeFlinkSSQL {
 		title := "%flink.conf\n\n"
 		home := "FLINK_HOME " + flinkHome + "\n"
 		mode := "flink.execution.mode remote\n"
@@ -35,7 +19,7 @@ func GenerateFlinkConf(flinkHome string, flinkExecJars string, engineHost string
 		jars := "flink.execution.jars " + flinkExecJars + "\n"
 
 		return title + home + mode + host + port + jars
-	} else if nodeType == FlinkJobJar {
+	} else if nodeType == constants.NodeTypeFlinkJob {
 		title := "%sh.conf\n\n"
 		timeOut := "shell.command.timeout.millisecs    315360000000" // 1000×60×60×24×365×10 10years
 		return title + timeOut
@@ -43,142 +27,163 @@ func GenerateFlinkConf(flinkHome string, flinkExecJars string, engineHost string
 	return
 }
 
-func GenerateFlinkJob(client SourceClient, flinkHome string, flinkAddr string, nodeType string, depends string, mainRun string) (dependsText string, mainRunText string, resources string, err error) {
+func GenerateFlinkJob(client SourceClient, flinkHome string, flinkAddr string, nodeType int32, depends string) (dependsText string, mainRunText string, resources JobResources, err error) {
 	var (
-		title       string
-		property    string
-		tablesName  map[string]string
-		dependsJson map[string]string
+		title      string
+		tablesName map[string]string
+		ssql       constants.FlinkSSQL
+		job        constants.FlinkJob
 	)
 
 	tablesName = make(map[string]string)
 
-	if err = json.Unmarshal([]byte(depends), &dependsJson); err != nil {
-		return
-	}
-
-	if nodeType == FlinkJobSsql {
-		if _, ok := dependsJson[dependTable]; ok == false {
-			err = fmt.Errorf("can't find " + dependTable + " in depends")
+	if nodeType == constants.NodeTypeFlinkSSQL {
+		var property string
+		if err = json.Unmarshal([]byte(depends), &ssql); err != nil {
 			return
 		}
-		if _, ok := dependsJson[dependFunc]; ok == false {
-			err = fmt.Errorf("can't find " + dependFunc + " in depends")
-			return
-		}
-		if _, ok := dependsJson[dependParallelism]; ok == false {
-			err = fmt.Errorf("can't find " + dependParallelism + " in depends")
-			return
-		}
-		if dependsJson[dependParallelism] == "0" || dependsJson[dependParallelism] == "" {
-			property = ""
+		if ssql.Parallelism > 0 {
+			property = "(parallelism=" + fmt.Sprintf("%d", ssql.Parallelism) + ")"
 		} else {
-			property = "(parallelism=" + dependsJson[dependParallelism] + ")"
+			property = ""
 		}
 
 		title = "%flink.ssql" + property + "\n\n"
-	} else if nodeType == "jar" {
-		/*
-			if _, ok := dependsJson[dependFunc]; ok == false {
-				err = fmt.Errorf("can't find " + dependFunc + " in depends")
-				return
-			}
-		*/
-		if _, ok := dependsJson[dependParallelism]; ok == false {
-			err = fmt.Errorf("can't find " + dependParallelism + " in depends")
+	} else if nodeType == constants.NodeTypeFlinkJob {
+		var checkv = regexp.MustCompile(`^[a-zA-Z0-9_/. ]*$`).MatchString
+
+		if err = json.Unmarshal([]byte(depends), &job); err != nil {
 			return
 		}
 
-		v, ok := dependsJson[dependJarArgs]
-		if ok == false {
-			err = fmt.Errorf("can't find " + dependJarArgs + " in depends")
+		if checkv(job.JarArgs) == false {
+			err = fmt.Errorf("only ^[a-zA-Z0-9_/. ]*$ is allow in jarargs")
 			return
-		} else {
-			if len(v) > 0 {
-				var checkv = regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString
-				if checkv(v) == false {
-					err = fmt.Errorf("only [a-zA-Z0-9] is allow in jarargs")
-					return
-				}
-			}
-
 		}
-
-		if _, ok := dependsJson[dependJarEntry]; ok == false {
-			err = fmt.Errorf("can't find " + dependJarEntry + " in depends")
+		if checkv(job.JarEntry) == false {
+			err = fmt.Errorf("only ^[a-zA-Z0-9_/. ]*$ is allow in jarentry")
 			return
 		}
 
 		title = "%sh\n\n"
 	} else {
-		err = fmt.Errorf("flink don't support the job type %s", nodeType)
+		err = fmt.Errorf("flink don't support the job type %d", nodeType)
 		return
 	}
 
-	dependsText += title //if don't have any thing,  the title will run success.
-	if nodeType == FlinkJobSsql {
-		// table
-		tablesID := strings.Split(strings.Replace(dependsJson[dependTable], " ", "", -1), ",")
-		for _, table := range tablesID {
+	dependsText += title
+	if nodeType == constants.NodeTypeFlinkSSQL {
+		for _, table := range ssql.Tables {
 			sourceID, tableName, tableUrl, errTmp := client.DescribeSourceTable(table)
 			if errTmp != nil {
 				err = errTmp
 				return
 			}
-
-			var tableUrlJson map[string]string
-			if err = json.Unmarshal([]byte(tableUrl), &tableUrlJson); err != nil {
-				return
-			}
-			tablesName[table] = tableName
-			dependsText += "drop table if exists " + tableName + ";\n"
-			dependsText += "create table " + tableName + "\n"
-			dependsText += tableUrlJson["sqlColumn"] + " WITH (\n"
-
 			sourceType, ManagerUrl, errTmp := client.DescribeSourceManager(sourceID)
 			if errTmp != nil {
 				err = errTmp
 				return
 			}
-			var ManagerUrlJson map[string]string
-			if err = json.Unmarshal([]byte(ManagerUrl), &ManagerUrlJson); err != nil {
-				return
-			}
-			if sourceType == SourceTypeMysql {
+
+			tablesName[table] = tableName
+			dependsText += "drop table if exists " + tableName + ";\n"
+			dependsText += "create table " + tableName + "\n"
+
+			if sourceType == constants.SourceTypeMysql {
+				var m constants.SourceMysqlParams
+				var t constants.FlinkTableDefineMysql
+
+				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
+					return
+				}
+				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
+					return
+				}
+				dependsText += "("
+				first := true
+				for _, column := range t.SqlColumn {
+					if first == true {
+						dependsText += column
+						first = false
+					} else {
+						dependsText += "," + column
+					}
+				}
+				dependsText += ") WITH (\n"
 				dependsText += "'connector' = 'jdbc',\n"
-				dependsText += "'url' = 'jdbc:" + "mysql" + "://" + ManagerUrlJson["host"] + ":" + ManagerUrlJson["port"] + "/" + ManagerUrlJson["database"] + "',\n"
+				dependsText += "'url' = 'jdbc:" + "mysql" + "://" + m.Host + ":" + fmt.Sprintf("%d", m.Port) + "/" + m.Database + "',\n"
 				dependsText += "'table-name' = '" + tableName + "',\n"
-				dependsText += "'username' = '" + ManagerUrlJson["user"] + "',\n"
-				dependsText += "'password' = '" + ManagerUrlJson["password"] + "'\n"
-				if ManagerUrlJson["connector_options"] != "" {
-					dependsText += "," + ManagerUrlJson["connector_options"] + "\n"
+				dependsText += "'username' = '" + m.User + "',\n"
+				dependsText += "'password' = '" + m.Password + "'\n"
+				for _, opt := range m.ConnectorOptions {
+					dependsText += "," + opt + "\n"
 				}
-				if tableUrlJson["connector_options"] != "" {
-					dependsText += "," + tableUrlJson["connector_options"] + "\n"
+				for _, opt := range t.ConnectorOptions {
+					dependsText += "," + opt + "\n"
 				}
-			} else if sourceType == SourceTypePostgreSQL {
+			} else if sourceType == constants.SourceTypePostgreSQL {
+				var m constants.SourcePostgreSQLParams
+				var t constants.FlinkTableDefinePostgreSQL
+
+				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
+					return
+				}
+				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
+					return
+				}
+				dependsText += "("
+				first := true
+				for _, column := range t.SqlColumn {
+					if first == true {
+						dependsText += column
+						first = false
+					} else {
+						dependsText += "," + column
+					}
+				}
+				dependsText += ") WITH (\n"
 				dependsText += "'connector' = 'jdbc',\n"
-				dependsText += "'url' = 'jdbc:" + "postgresql" + "://" + ManagerUrlJson["host"] + ":" + ManagerUrlJson["port"] + "/" + ManagerUrlJson["database"] + "',\n"
+				dependsText += "'url' = 'jdbc:" + "postgresql" + "://" + m.Host + ":" + fmt.Sprintf("%d", m.Port) + "/" + m.Database + "',\n"
 				dependsText += "'table-name' = '" + tableName + "',\n"
-				dependsText += "'username' = '" + ManagerUrlJson["user"] + "',\n"
-				dependsText += "'password' = '" + ManagerUrlJson["password"] + "'\n"
-				if ManagerUrlJson["connector_options"] != "" {
-					dependsText += "," + ManagerUrlJson["connector_options"] + "\n"
+				dependsText += "'username' = '" + m.User + "',\n"
+				dependsText += "'password' = '" + m.Password + "'\n"
+				for _, opt := range m.ConnectorOptions {
+					dependsText += "," + opt + "\n"
 				}
-				if tableUrlJson["connector_options"] != "" {
-					dependsText += "," + tableUrlJson["connector_options"] + "\n"
+				for _, opt := range t.ConnectorOptions {
+					dependsText += "," + opt + "\n"
 				}
-			} else if sourceType == SourceTypeKafka {
+			} else if sourceType == constants.SourceTypeKafka {
+				var m constants.SourceKafkaParams
+				var t constants.FlinkTableDefineKafka
+
+				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
+					return
+				}
+				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
+					return
+				}
+				dependsText += "("
+				first := true
+				for _, column := range t.SqlColumn {
+					if first == true {
+						dependsText += column
+						first = false
+					} else {
+						dependsText += "," + column
+					}
+				}
+				dependsText += ") WITH (\n"
+
 				dependsText += "'connector' = 'kafka',\n"
-				dependsText += "'topic' = '" + tableUrlJson["topic"] + "',\n"
-				dependsText += "'properties.bootstrap.servers' = '" + ManagerUrlJson["host"] + ":" + ManagerUrlJson["port"] + "',\n"
-				dependsText += "'properties.group.id' = '" + tableUrlJson["groupid"] + "',\n"
-				dependsText += "'format' = '" + tableUrlJson["format"] + "'\n"
-				if ManagerUrlJson["connector_options"] != "" {
-					dependsText += "," + ManagerUrlJson["connector_options"] + "\n"
+				dependsText += "'topic' = '" + t.Topic + "',\n"
+				dependsText += "'properties.bootstrap.servers' = '" + m.Host + ":" + fmt.Sprintf("%d", m.Port) + "',\n"
+				dependsText += "'format' = '" + t.Format + "'\n"
+				for _, opt := range m.ConnectorOptions {
+					dependsText += "," + opt + "\n"
 				}
-				if tableUrlJson["connector_options"] != "" {
-					dependsText += "," + tableUrlJson["connector_options"] + "\n"
+				for _, opt := range t.ConnectorOptions {
+					dependsText += "," + opt + "\n"
 				}
 			} else {
 				err = fmt.Errorf("don't support this source mananger %s", sourceType)
@@ -187,40 +192,38 @@ func GenerateFlinkJob(client SourceClient, flinkHome string, flinkAddr string, n
 
 			dependsText += ");\n\n\n"
 		}
-	} else if nodeType == FlinkJobJar {
+	} else if nodeType == constants.NodeTypeFlinkJob {
 		dependsText += "ls" //empty is not allow.
 	}
 
 	// main run
 	mainRunText += title
-	if nodeType == FlinkJobSsql {
-		mainRunText += mainRun
+	if nodeType == constants.NodeTypeFlinkSSQL {
+		mainRunText += ssql.MainRun
 		for table, tableName := range tablesName {
-			mainRunText = strings.Replace(mainRunText, workbenchQuote+table+workbenchQuote, tableName, -1)
+			mainRunText = strings.Replace(mainRunText, constants.MainRunQuote+table+constants.MainRunQuote, tableName, -1)
 		}
 		mainRunText += "\n"
-		resources = "{}"
-	} else if nodeType == FlinkJobJar {
+	} else if nodeType == constants.NodeTypeFlinkJob {
 		var (
 			entry          string
 			jarParallelism string
 		)
 
-		if dependsJson[dependJarEntry] == "" {
+		if len(job.JarEntry) > 0 {
 			entry = ""
 		} else {
-			entry = " -c " + dependsJson[dependJarEntry] + " "
+			entry = " -c '" + job.JarEntry + "' "
 		}
 
-		if dependsJson[dependParallelism] == "0" || dependsJson[dependParallelism] == "" {
-			jarParallelism = ""
+		if job.Parallelism > 0 {
+			jarParallelism = " -p " + fmt.Sprintf("%d", job.Parallelism) + " "
 		} else {
-			jarParallelism = " -p " + dependsJson[dependParallelism] + " "
+			jarParallelism = ""
 		}
 		//TODO download
-		mainRunText += flinkHome + "/bin/flink run -m " + flinkAddr + jarParallelism + entry + mainRun + " " + dependsJson[dependJarArgs]
-
-		resources = `{"` + FlinkJobJar + `": "` + mainRun + `"}`
+		mainRunText += flinkHome + "/bin/flink run -m " + flinkAddr + jarParallelism + entry + job.MainRun + " " + job.JarArgs
+		resources.Jar = job.MainRun
 	}
 
 	return

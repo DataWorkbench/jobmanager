@@ -23,7 +23,7 @@ func NewJobManagerServer(executor *executor.JobmanagerExecutor) *JobManagerServe
 }
 
 func (s *JobManagerServer) RunJob(ctx context.Context, req *jobpb.RunJobRequest) (*jobpb.JobReply, error) {
-	rep, err := s.executor.RunJob(ctx, req.GetID(), req.GetWorkspaceID(), req.GetNodeType(), req.GetDepends(), req.GetMainRun())
+	rep, err := s.executor.RunJob(ctx, req.GetID(), req.GetWorkspaceID(), req.GetNodeType(), req.GetDepends())
 	return &rep, err
 }
 
