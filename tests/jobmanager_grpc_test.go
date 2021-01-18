@@ -51,7 +51,7 @@ func typeToJsonString(v interface{}) string {
 var client jobpb.JobmanagerClient
 var ctx context.Context
 
-func mainInit(t *testing.T) {
+func mainInit(t *testing.T, manualInit bool) {
 	// create table in mysql
 	dsn := "root:123456@tcp(127.0.0.1:3306)/data_workbench"
 	db, cerr := gorm.Open(mysql.Open(dsn), &gorm.Config{})
@@ -60,6 +60,16 @@ func mainInit(t *testing.T) {
 	db.Exec("CREATE TABLE IF NOT EXISTS pd(id bigint, id1 bigint)")
 	db.Exec("insert into ms values(1, 1)")
 	db.Exec("insert into ms values(2, 2)")
+	if manualInit == true {
+		db.Exec("CREATE TABLE IF NOT EXISTS mc(rate bigint, dbmoney varchar(10))")
+		db.Exec("CREATE TABLE IF NOT EXISTS mcd(total bigint)")
+		db.Exec("CREATE TABLE IF NOT EXISTS mw(rate bigint, dbmoney varchar(10))")
+		db.Exec("CREATE TABLE IF NOT EXISTS mwd(total bigint)")
+		db.Exec("insert into mc values(2, 'EUR')")
+		db.Exec("insert into mc values(7, 'USD')")
+		db.Exec("insert into mw values(2, 'EUR')")
+		db.Exec("insert into mw values(7, 'USD')")
+	}
 
 	mspd = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012348"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012348$qc$ select * from $qc$sot-0123456789012347$qc$"})}
 	mspdcancel = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012348"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012348$qc$ select * from $qc$sot-0123456789012347$qc$"})}
@@ -92,7 +102,7 @@ func mainInit(t *testing.T) {
 }
 
 func TestJobManagerGRPC_RunJob(t *testing.T) {
-	mainInit(t)
+	mainInit(t, false)
 
 	_, err := client.RunJob(ctx, &mspd)
 	require.Nil(t, err, "%+v", err)
@@ -129,7 +139,7 @@ func TestJobManagerGRPC_CancelJob(t *testing.T) {
 }
 
 func TestJobManagerGRPC_RunJobManual(t *testing.T) {
-	//mainInit(t)
+	//mainInit(t, true)
 	//var err error
 
 	//_, err = client.RunJob(ctx, &mspdpg)
