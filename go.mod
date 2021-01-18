@@ -12,5 +12,6 @@ require (
 	github.com/stretchr/testify v1.6.1
 	google.golang.org/grpc v1.34.0
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
+	gorm.io/driver/mysql v1.0.3
 	gorm.io/gorm v1.20.8
 )

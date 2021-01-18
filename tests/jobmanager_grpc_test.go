@@ -3,8 +3,8 @@ package tests
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
+	"time"
 
 	"github.com/DataWorkbench/glog"
 	"github.com/stretchr/testify/require"
@@ -17,17 +17,18 @@ import (
 	"crypto/rand"
 	"math/big"
 
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+
 	"github.com/DataWorkbench/gproto/pkg/jobpb"
 )
 
-var infos []jobpb.RunJobRequest
-var client jobpb.JobmanagerClient
-var ctx context.Context
-
-func typeToJsonString(v interface{}) string {
-	s, _ := json.Marshal(&v)
-	return string(s)
-}
+var mspd jobpb.RunJobRequest       //regress test
+var mspdcancel jobpb.RunJobRequest //regress test
+var mspdpg jobpb.RunJobRequest     //manual test
+var mw jobpb.RunJobRequest         //manual test
+var mc jobpb.RunJobRequest         //manual test
+var jar jobpb.RunJobRequest        //manual test
 
 func CreateRandomString(len int) string {
 	var container string
@@ -42,28 +43,31 @@ func CreateRandomString(len int) string {
 	return container
 }
 
+func typeToJsonString(v interface{}) string {
+	s, _ := json.Marshal(&v)
+	return string(s)
+}
+
+var client jobpb.JobmanagerClient
+var ctx context.Context
+
 func mainInit(t *testing.T) {
-	if len(infos) != 0 {
-		return
-	}
+	// create table in mysql
+	dsn := "root:123456@tcp(127.0.0.1:3306)/data_workbench"
+	db, cerr := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	require.Nil(t, cerr, "%+v", cerr)
+	db.Exec("CREATE TABLE IF NOT EXISTS ms(id bigint, id1 bigint)")
+	db.Exec("CREATE TABLE IF NOT EXISTS pd(id bigint, id1 bigint)")
+	db.Exec("insert into ms values(1, 1)")
+	db.Exec("insert into ms values(2, 2)")
 
-	// MySQL to pg
-	infos = append(infos, jobpb.RunJobRequest{
-		ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012345"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012345$qc$ select * from $qc$sot-0123456789012347$qc$"})})
-
-	// kafka join common table
-	/*
-		infos = append(infos, jobpb.RunJobRequest{
-			ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012357", "sot-0123456789012358", "sot-0123456789012346"}, MainRun: "insert into $qc$sot-0123456789012358$qc$ select  $qc$sot-0123456789012357$qc$.rate * $qc$sot-0123456789012346$qc$.paycount from  $qc$sot-0123456789012357$qc$, $qc$sot-0123456789012346$qc$ where $qc$sot-0123456789012346$qc$.paymoney =  $qc$sot-0123456789012357$qc$.dbmoney  "})}) //{"paycount": 2, "paymoney": "EUR"} {"paycount": 1, "paymoney": "USD"}
-
-		// kafka join dimension table
-		infos = append(infos, jobpb.RunJobRequest{
-			ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012355", "sot-0123456789012356", "sot-0123456789012346"}, Parallelism: 2, JobCpu: 2, JobMem: 2, TaskCpu: 0.2, TaskMem: 256, TaskNum: 2, MainRun: "insert into $qc$sot-0123456789012356$qc$ SELECT k.paycount * r.rate FROM $qc$sot-0123456789012346$qc$ AS k JOIN $qc$sot-0123456789012355$qc$ FOR SYSTEM_TIME AS OF k.tproctime AS r ON r.dbmoney = k.paymoney "})})
-
-		// jar
-		infos = append(infos, jobpb.RunJobRequest{
-			ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkJob, Depends: typeToJsonString(constants.FlinkJob{Parallelism: 2, JobCpu: 2, JobMem: 2, TaskCpu: 0.2, TaskMem: 2, TaskNum: 2, JarArgs: "", JarEntry: "org.apache.flink.streaming.examples.wordcount.WordCount", MainRun: "/home/lzzhang/bigdata/flink-bin-download/flink-job-artifacts/WordCount.jar"})})
-	*/
+	mspd = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012348"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012348$qc$ select * from $qc$sot-0123456789012347$qc$"})}
+	mspdcancel = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012348"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012348$qc$ select * from $qc$sot-0123456789012347$qc$"})}
+	mspdpg = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012345"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012345$qc$ select * from $qc$sot-0123456789012347$qc$"})}
+	mc = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012357", "sot-0123456789012358", "sot-0123456789012346"}, MainRun: "insert into $qc$sot-0123456789012358$qc$ select  $qc$sot-0123456789012357$qc$.rate * $qc$sot-0123456789012346$qc$.paycount from  $qc$sot-0123456789012357$qc$, $qc$sot-0123456789012346$qc$ where $qc$sot-0123456789012346$qc$.paymoney =  $qc$sot-0123456789012357$qc$.dbmoney  "})}
+	//{"paycount": 2, "paymoney": "EUR"} {"paycount": 1, "paymoney": "USD"}
+	mw = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012355", "sot-0123456789012356", "sot-0123456789012346"}, Parallelism: 2, JobCpu: 2, JobMem: 2, TaskCpu: 0.2, TaskMem: 256, TaskNum: 2, MainRun: "insert into $qc$sot-0123456789012356$qc$ SELECT k.paycount * r.rate FROM $qc$sot-0123456789012346$qc$ AS k JOIN $qc$sot-0123456789012355$qc$ FOR SYSTEM_TIME AS OF k.tproctime AS r ON r.dbmoney = k.paymoney "})}
+	jar = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkJob, Depends: typeToJsonString(constants.FlinkJob{Parallelism: 2, JobCpu: 2, JobMem: 2, TaskCpu: 0.2, TaskMem: 2, TaskNum: 2, JarArgs: "", JarEntry: "org.apache.flink.streaming.examples.wordcount.WordCount", MainRun: "/home/lzzhang/bigdata/flink-bin-download/flink-job-artifacts/WordCount.jar"})}
 
 	address := "127.0.0.1:51001"
 	lp := glog.NewDefault()
@@ -90,30 +94,53 @@ func mainInit(t *testing.T) {
 func TestJobManagerGRPC_RunJob(t *testing.T) {
 	mainInit(t)
 
-	for info := range infos {
-		_, err := client.RunJob(ctx, &infos[info])
-		require.Nil(t, err, "%+v", err)
-	}
+	_, err := client.RunJob(ctx, &mspd)
+	require.Nil(t, err, "%+v", err)
 }
 
 func TestJobManagerGRPC_GetJobStatus(t *testing.T) {
-	var req jobpb.GetJobStatusRequest
+	for {
+		var req jobpb.GetJobStatusRequest
+		req.ID = mspd.ID
 
-	mainInit(t)
-	req.ID = infos[0].ID
-
-	rep, err := client.GetJobStatus(ctx, &req)
-	require.Nil(t, err, "%+v", err)
-	fmt.Println(rep)
+		rep, err := client.GetJobStatus(ctx, &req)
+		require.Nil(t, err, "%+v", err)
+		if rep.Status == constants.InstanceStateRunning {
+			time.Sleep(time.Second)
+		} else if rep.Status == constants.InstanceStateFailed {
+			require.Equal(t, "success", "failed")
+		} else if rep.Status == constants.InstanceStateSucceed {
+			break
+		}
+	}
 }
 
 func TestJobManagerGRPC_CancelJob(t *testing.T) {
 	var req jobpb.CancelJobRequest
+	var err error
 
-	mainInit(t)
-	req.ID = infos[0].ID
-	req.ID = "JT6o56gIFoYhMKhBktAK"
-
-	_, err := client.CancelJob(ctx, &req)
+	_, err = client.RunJob(ctx, &mspdcancel)
 	require.Nil(t, err, "%+v", err)
+
+	req.ID = mspdcancel.ID
+
+	_, err = client.CancelJob(ctx, &req)
+	require.Nil(t, err, "%+v", err)
+}
+
+func TestJobManagerGRPC_RunJobManual(t *testing.T) {
+	//mainInit(t)
+	//var err error
+
+	//_, err = client.RunJob(ctx, &mspdpg)
+	//require.Nil(t, err, "%+v", err)
+	//
+	//_, err = client.RunJob(ctx, &mc)
+	//require.Nil(t, err, "%+v", err)
+	//
+	//_, err = client.RunJob(ctx, &mw)
+	//require.Nil(t, err, "%+v", err)
+	//
+	//_, err = client.RunJob(ctx, &jar)
+	//require.Nil(t, err, "%+v", err)
 }
