@@ -49,19 +49,21 @@ func mainInit(t *testing.T) {
 
 	// MySQL to pg
 	infos = append(infos, jobpb.RunJobRequest{
-		ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012345", "sot-0123456789012346"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012346$qc$ select * from $qc$sot-0123456789012345$qc$"})})
+		ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012345"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012345$qc$ select * from $qc$sot-0123456789012347$qc$"})})
 
 	// kafka join common table
-	infos = append(infos, jobpb.RunJobRequest{
-		ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012349", "sot-0123456789012350", "sot-0123456789012351"}, MainRun: "insert into $qc$sot-0123456789012350$qc$ select  $qc$sot-0123456789012349$qc$.rate * $qc$sot-0123456789012351$qc$.paycount from  $qc$sot-0123456789012349$qc$, $qc$sot-0123456789012351$qc$ where $qc$sot-0123456789012351$qc$.paymoney =  $qc$sot-0123456789012349$qc$.dbmoney  "})}) //{"paycount": 2, "paymoney": "EUR"} {"paycount": 1, "paymoney": "USD"}
+	/*
+		infos = append(infos, jobpb.RunJobRequest{
+			ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012357", "sot-0123456789012358", "sot-0123456789012346"}, MainRun: "insert into $qc$sot-0123456789012358$qc$ select  $qc$sot-0123456789012357$qc$.rate * $qc$sot-0123456789012346$qc$.paycount from  $qc$sot-0123456789012357$qc$, $qc$sot-0123456789012346$qc$ where $qc$sot-0123456789012346$qc$.paymoney =  $qc$sot-0123456789012357$qc$.dbmoney  "})}) //{"paycount": 2, "paymoney": "EUR"} {"paycount": 1, "paymoney": "USD"}
 
-	// kafka join dimension table
-	infos = append(infos, jobpb.RunJobRequest{
-		ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012348", "sot-0123456789012351"}, Parallelism: 2, JobCpu: 2, JobMem: 2, TaskCpu: 0.2, TaskMem: 256, TaskNum: 2, MainRun: "insert into $qc$sot-0123456789012348$qc$ SELECT k.paycount * r.rate FROM $qc$sot-0123456789012351$qc$ AS k JOIN $qc$sot-0123456789012347$qc$ FOR SYSTEM_TIME AS OF k.tproctime AS r ON r.dbmoney = k.paymoney "})})
+		// kafka join dimension table
+		infos = append(infos, jobpb.RunJobRequest{
+			ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012355", "sot-0123456789012356", "sot-0123456789012346"}, Parallelism: 2, JobCpu: 2, JobMem: 2, TaskCpu: 0.2, TaskMem: 256, TaskNum: 2, MainRun: "insert into $qc$sot-0123456789012356$qc$ SELECT k.paycount * r.rate FROM $qc$sot-0123456789012346$qc$ AS k JOIN $qc$sot-0123456789012355$qc$ FOR SYSTEM_TIME AS OF k.tproctime AS r ON r.dbmoney = k.paymoney "})})
 
-	// jar
-	infos = append(infos, jobpb.RunJobRequest{
-		ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkJob, Depends: typeToJsonString(constants.FlinkJob{Parallelism: 2, JobCpu: 2, JobMem: 2, TaskCpu: 0.2, TaskMem: 2, TaskNum: 2, JarArgs: "", JarEntry: "org.apache.flink.streaming.examples.wordcount.WordCount", MainRun: "/home/lzzhang/bigdata/flink-bin-download/flink-job-artifacts/WordCount.jar"})})
+		// jar
+		infos = append(infos, jobpb.RunJobRequest{
+			ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkJob, Depends: typeToJsonString(constants.FlinkJob{Parallelism: 2, JobCpu: 2, JobMem: 2, TaskCpu: 0.2, TaskMem: 2, TaskNum: 2, JarArgs: "", JarEntry: "org.apache.flink.streaming.examples.wordcount.WordCount", MainRun: "/home/lzzhang/bigdata/flink-bin-download/flink-job-artifacts/WordCount.jar"})})
+	*/
 
 	address := "127.0.0.1:51001"
 	lp := glog.NewDefault()

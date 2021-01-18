@@ -17,8 +17,9 @@ func GenerateFlinkConf(flinkHome string, flinkExecJars string, engineHost string
 		host := "flink.execution.remote.host	" + engineHost + "\n"
 		port := "flink.execution.remote.port	" + enginePort + "\n"
 		jars := "flink.execution.jars " + flinkExecJars + "\n"
+		others := "zeppelin.flink.concurrentBatchSql.max 1000000\nzeppelin.flink.concurrentStreamSql.max 1000000\n"
 
-		return title + home + mode + host + port + jars
+		return title + home + mode + host + port + jars + others
 	} else if nodeType == constants.NodeTypeFlinkJob {
 		title := "%sh.conf\n\n"
 		timeOut := "shell.command.timeout.millisecs    315360000000" // 1000×60×60×24×365×10 10years

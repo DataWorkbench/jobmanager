@@ -6,11 +6,11 @@ create table jobmanager (
 	id varchar(24),
 	noteID varchar(9),
 	status varchar(20),
-	message varchar(5000),
+	message text,
 	paragraph varchar(2000),
 	createtime timestamp default now(),
 	updatetime timestamp,
-	resources varchar(1000)
+	resources varchar(2000)
 );
 
 alter table jobmanager add constraint jobmanager_pkey primary key(id);

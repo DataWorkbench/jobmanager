@@ -25,6 +25,8 @@ github.com/DataWorkbench/gproto v0.0.0-20201223100321-cccb39491a91 h1:oOVbTtUZji
 github.com/DataWorkbench/gproto v0.0.0-20201223100321-cccb39491a91/go.mod h1:ZCyz1BvwA0kGnybpNCnBRfFqgDKu73YFQ9yE/rUSRfo=
 github.com/DataWorkbench/gproto v0.0.0-20201230045406-c613b833bf01 h1:LGveSDl6JZO9B5rQAyRtP9GMCnpRKliQmGU1ZIirFr4=
 github.com/DataWorkbench/gproto v0.0.0-20201230045406-c613b833bf01/go.mod h1:ZCyz1BvwA0kGnybpNCnBRfFqgDKu73YFQ9yE/rUSRfo=
+github.com/DataWorkbench/gproto v0.0.0-20210118141207-a1ced9a6f749 h1:ll6LWgF5O+yUxcinSJaUpSoLNFsIK2BMBstJcm/rAHU=
+github.com/DataWorkbench/gproto v0.0.0-20210118141207-a1ced9a6f749/go.mod h1:ZCyz1BvwA0kGnybpNCnBRfFqgDKu73YFQ9yE/rUSRfo=
 github.com/DataWorkbench/loader v0.0.0-20201119073611-6f210eb11a8c h1:HcEtluqqKKkBW4wK8YvnCIPxtffbEYBrVr3x/T98vWU=
 github.com/DataWorkbench/loader v0.0.0-20201119073611-6f210eb11a8c/go.mod h1:K2ou8EU8Cto30za+mKbfCXXc8C6BRpyCjg+4E2CRwV4=
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=

@@ -134,10 +134,6 @@ func Int32StatusToString(i int32) (r string) {
 func (ex *JobmanagerExecutor) ModifyStatus(ctx context.Context, ID string, status int32, message string, resources JobResources) (err error) {
 	var info JobmanagerInfo
 
-	if len(message) > 4000 {
-		message = message[0:4000]
-	}
-
 	info.ID = ID
 	info.Status = Int32StatusToString(status)
 	info.Message = message
@@ -151,7 +147,6 @@ func (ex *JobmanagerExecutor) ModifyStatus(ctx context.Context, ID string, statu
 	if status == StatusFinish || status == StatusFailed {
 		//TODO delete jar, if len > 0
 		ex.logger.Info().Msg("delete jar").String("jar", resources.Jar).Fire()
-		//TODO feedback schedule. InstanceStateFailed, InstanceStateSucceed
 
 		FreeEngine(ID)
 	}
@@ -476,5 +471,6 @@ func (ex *JobmanagerExecutor) CancelJob(ctx context.Context, ID string) (err err
 	}
 	ex.logger.Warn().Msg("user cancel job").String("id", ID).Fire() // if use cancel.  log is necessary
 	err = ex.httpClient.StopAllParagraphs(job.NoteID)
+	//TODO jar. cancel trigger savepoint
 	return
 }
