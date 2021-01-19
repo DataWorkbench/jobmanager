@@ -186,6 +186,34 @@ func GenerateFlinkJob(client SourceClient, flinkHome string, flinkAddr string, n
 				for _, opt := range t.ConnectorOptions {
 					dependsText += "," + opt + "\n"
 				}
+			} else if sourceType == constants.SourceTypeS3 {
+				var m constants.SourceS3Params
+				var t constants.FlinkTableDefineS3
+
+				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
+					return
+				}
+				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
+					return
+				}
+				dependsText += "("
+				first := true
+				for _, column := range t.SqlColumn {
+					if first == true {
+						dependsText += column
+						first = false
+					} else {
+						dependsText += "," + column
+					}
+				}
+				dependsText += ") WITH (\n"
+
+				dependsText += "'connector' = 'filesystem',\n"
+				dependsText += "'path' = '" + t.Path + "',\n"
+				dependsText += "'format' = '" + t.Format + "'\n"
+				for _, opt := range t.ConnectorOptions {
+					dependsText += "," + opt + "\n"
+				}
 			} else {
 				err = fmt.Errorf("don't support this source mananger %s", sourceType)
 				return
@@ -227,5 +255,43 @@ func GenerateFlinkJob(client SourceClient, flinkHome string, flinkAddr string, n
 		resources.Jar = job.MainRun
 	}
 
+	return
+}
+
+func GetS3Info(client SourceClient, depends string) (s3info constants.SourceS3Params, err error) {
+	var ssql constants.FlinkSSQL
+
+	if err = json.Unmarshal([]byte(depends), &ssql); err != nil {
+		return
+	}
+
+	for _, table := range ssql.Tables {
+		sourceID, _, _, errTmp := client.DescribeSourceTable(table)
+		if errTmp != nil {
+			err = errTmp
+			return
+		}
+		sourceType, ManagerUrl, errTmp := client.DescribeSourceManager(sourceID)
+		if errTmp != nil {
+			err = errTmp
+			return
+		}
+
+		if sourceType == constants.SourceTypeS3 {
+			var m constants.SourceS3Params
+
+			if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
+				return
+			}
+			if s3info.AccessKey == "" {
+				s3info.AccessKey = m.AccessKey
+				s3info.SecretKey = m.SecretKey
+				s3info.EndPoint = m.EndPoint
+			} else if s3info.AccessKey != m.AccessKey || s3info.SecretKey != m.SecretKey || s3info.EndPoint != m.EndPoint {
+				err = fmt.Errorf("only allow one s3 sourcemanger in a job, all accesskey secretkey endpoint is same")
+				return
+			}
+		}
+	}
 	return
 }

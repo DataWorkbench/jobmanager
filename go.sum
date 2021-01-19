@@ -19,6 +19,10 @@ github.com/DataWorkbench/common v0.0.0-20201230023001-cd584507df09 h1:wUkFlxwNiU
 github.com/DataWorkbench/common v0.0.0-20201230023001-cd584507df09/go.mod h1:vVEyPxAs/EJ28FZUL4ChCC0JJ7yKalWReoFSVtWpwDs=
 github.com/DataWorkbench/common v0.0.0-20201230052134-abf74192ed00 h1:kGhJasIOBJlF98KSEs9srSKxzX0CknNgLnsQteyymwg=
 github.com/DataWorkbench/common v0.0.0-20201230052134-abf74192ed00/go.mod h1:vVEyPxAs/EJ28FZUL4ChCC0JJ7yKalWReoFSVtWpwDs=
+github.com/DataWorkbench/common v0.0.0-20210119131012-d46a334fa62c h1:AtSUFYTYfeefz7Od2aMH4zQaTwcsBVIgwKtnbJr2SeE=
+github.com/DataWorkbench/common v0.0.0-20210119131012-d46a334fa62c/go.mod h1:vVEyPxAs/EJ28FZUL4ChCC0JJ7yKalWReoFSVtWpwDs=
+github.com/DataWorkbench/common v0.0.0-20210119144535-c6cf9276a152 h1:d9H2jTmGtO+2faWcDtb1tZpV7u5ytIhElZNYkg3uNRw=
+github.com/DataWorkbench/common v0.0.0-20210119144535-c6cf9276a152/go.mod h1:vVEyPxAs/EJ28FZUL4ChCC0JJ7yKalWReoFSVtWpwDs=
 github.com/DataWorkbench/glog v0.0.0-20201114060240-9471edb2b8cf h1:JcbEUCoQOICv7iwJodQkzx/W9xtWerYi5iCShEJSS/Q=
 github.com/DataWorkbench/glog v0.0.0-20201114060240-9471edb2b8cf/go.mod h1:zymxJLXn162xdWYUqIb729S3ZzRQpdTj/LwnW+xxru4=
 github.com/DataWorkbench/gproto v0.0.0-20201223100321-cccb39491a91 h1:oOVbTtUZjiw0aOTT+IQAcwTDsiagfjQF88XTpnUm0rM=
