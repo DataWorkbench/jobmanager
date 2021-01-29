@@ -154,6 +154,39 @@ func GenerateFlinkJob(client SourceClient, flinkHome string, flinkAddr string, n
 				for _, opt := range t.ConnectorOptions {
 					dependsText += "," + opt + "\n"
 				}
+			} else if sourceType == constants.SourceTypeClickHouse {
+				var m constants.SourceClickHouseParams
+				var t constants.FlinkTableDefineClickHouse
+
+				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
+					return
+				}
+				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
+					return
+				}
+				dependsText += "("
+				first := true
+				for _, column := range t.SqlColumn {
+					if first == true {
+						dependsText += column
+						first = false
+					} else {
+						dependsText += "," + column
+					}
+				}
+				dependsText += ") WITH (\n"
+				dependsText += "'connector' = 'clickhouse',\n"
+				dependsText += "'url' = 'clickhouse://" + m.Host + ":" + fmt.Sprintf("%d", m.Port) + "',\n"
+				dependsText += "'table-name' = '" + tableName + "',\n"
+				dependsText += "'username' = '" + m.User + "',\n"
+				dependsText += "'database-name' = '" + m.Database + "',\n"
+				dependsText += "'password' = '" + m.Password + "'\n"
+				for _, opt := range m.ConnectorOptions {
+					dependsText += "," + opt + "\n"
+				}
+				for _, opt := range t.ConnectorOptions {
+					dependsText += "," + opt + "\n"
+				}
 			} else if sourceType == constants.SourceTypeKafka {
 				var m constants.SourceKafkaParams
 				var t constants.FlinkTableDefineKafka
@@ -251,7 +284,7 @@ func GenerateFlinkJob(client SourceClient, flinkHome string, flinkAddr string, n
 			jarParallelism = ""
 		}
 		//TODO download
-		mainRunText += flinkHome + "/bin/flink run -m " + flinkAddr + jarParallelism + entry + job.MainRun + " " + job.JarArgs
+		mainRunText += flinkHome + "/bin/flink run -sae -m " + flinkAddr + jarParallelism + entry + job.MainRun + " " + job.JarArgs
 		resources.Jar = job.MainRun
 	}
 

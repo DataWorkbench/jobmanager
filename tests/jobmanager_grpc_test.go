@@ -30,6 +30,7 @@ var mw jobpb.RunJobRequest         //manual test
 var mc jobpb.RunJobRequest         //manual test
 var s3 jobpb.RunJobRequest         //manual test
 var jar jobpb.RunJobRequest        //manual test
+var ck jobpb.RunJobRequest         //manual test
 
 func CreateRandomString(len int) string {
 	var container string
@@ -80,6 +81,7 @@ func mainInit(t *testing.T, manualInit bool) {
 	mw = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012355", "sot-0123456789012356", "sot-0123456789012346"}, Parallelism: 2, JobCpu: 2, JobMem: 2, TaskCpu: 0.2, TaskMem: 256, TaskNum: 2, MainRun: "insert into $qc$sot-0123456789012356$qc$ SELECT k.paycount * r.rate FROM $qc$sot-0123456789012346$qc$ AS k JOIN $qc$sot-0123456789012355$qc$ FOR SYSTEM_TIME AS OF k.tproctime AS r ON r.dbmoney = k.paymoney "})}
 	jar = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkJob, Depends: typeToJsonString(constants.FlinkJob{Parallelism: 2, JobCpu: 2, JobMem: 2, TaskCpu: 0.2, TaskMem: 2, TaskNum: 2, JarArgs: "", JarEntry: "org.apache.flink.streaming.examples.wordcount.WordCount", MainRun: "/home/lzzhang/bigdata/flink-bin-download/flink-job-artifacts/WordCount.jar"})}
 	s3 = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012359", "sot-0123456789012360"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012360$qc$ select * from $qc$sot-0123456789012359$qc$"})}
+	ck = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: "wks-0123456789012345", NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012361"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012361$qc$ values(6, 6)"})}
 
 	address := "127.0.0.1:51001"
 	lp := glog.NewDefault()
@@ -143,6 +145,9 @@ func TestJobManagerGRPC_CancelJob(t *testing.T) {
 func TestJobManagerGRPC_RunJobManual(t *testing.T) {
 	//mainInit(t, true)
 	//var err error
+
+	//_, err = client.RunJob(ctx, &ck)
+	//require.Nil(t, err, "%+v", err)
 
 	//_, err = client.RunJob(ctx, &s3)
 	//require.Nil(t, err, "%+v", err)
