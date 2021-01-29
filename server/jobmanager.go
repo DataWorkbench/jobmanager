@@ -36,3 +36,8 @@ func (s *JobManagerServer) GetJobStatus(ctx context.Context, req *jobpb.GetJobSt
 	rep, err := s.executor.GetJobStatus(ctx, req.GetID())
 	return &rep, err
 }
+
+func (s *JobManagerServer) CancelAllJob(ctx context.Context, req *jobpb.CancelAllJobRequest) (*jobpb.EmptyReply, error) {
+	err := s.executor.CancelAllJob(ctx, req.GetSpaceID())
+	return s.emptyReply, err
+}

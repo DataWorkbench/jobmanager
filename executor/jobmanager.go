@@ -48,6 +48,7 @@ type JobmanagerInfo struct {
 	CreateTime string `gorm:"column:createtime;"`
 	UpdateTime string `gorm:"column:updatetime;"`
 	Resources  string `gorm:"column:resources;"`
+	SpaceID    string `gorm:"column:spaceid;"`
 }
 
 type EnginOptions struct {
@@ -211,6 +212,7 @@ func (ex *JobmanagerExecutor) RunJobUtile(ctx context.Context, ID string, Worksp
 	info.UpdateTime = info.CreateTime
 	info.Status = StatusRunningString
 	info.Message = JobRunning
+	info.SpaceID = WorkspaceID
 
 	engineOpts.JobID = info.ID
 	engineOpts.WorkspaceID = WorkspaceID
@@ -490,5 +492,28 @@ func (ex *JobmanagerExecutor) CancelJob(ctx context.Context, ID string) (err err
 	ex.logger.Warn().Msg("user cancel job").String("id", ID).Fire() // if use cancel.  log is necessary
 	err = ex.httpClient.StopAllParagraphs(job.NoteID)
 	//TODO jar. cancel trigger savepoint
+	return
+}
+
+func (ex *JobmanagerExecutor) CancelAllJob(ctx context.Context, SpaceID string) (err error) {
+	var (
+		jobs []JobmanagerInfo
+	)
+
+	db := ex.db.WithContext(ctx)
+	if err = db.Table(JobmanagerTableName).Select("id").Where("spaceid = '" + SpaceID + "' and status = '" + StatusRunningString + "'").Scan(&jobs).Error; err != nil {
+		ex.logger.Error().Msg("can't scan jobmanager table for cancel all job").Fire()
+		return
+	}
+
+	for _, job := range jobs {
+		tmperr := ex.CancelJob(ctx, job.ID)
+		if tmperr == nil {
+			ex.logger.Info().String("cancel all running job for spaceid", SpaceID).String("jobid", job.ID).Fire()
+		} else {
+			ex.logger.Error().String("cancel all running job for spaceid", SpaceID).String("jobid", job.ID).Fire()
+		}
+	}
+
 	return
 }
