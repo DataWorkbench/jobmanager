@@ -8,7 +8,7 @@ job_works: 8
 
 zeppelin_server: "127.0.0.1:8080"
 zeppelin_flink_home: "/home/lzzhang/bigdata/flink-bin-download/flink-1.11.2"
-zeppelin_flink_execute_jars: "/home/lzzhang/bigdata/flink-bin-download/zeppelin-0.9.0-bin-all/lib/flink-connector-jdbc_2.11-1.11.2.jar,/home/lzzhang/bigdata/flink-bin-download/zeppelin-0.9.0-bin-all/lib/mysql-connector-java-8.0.21.jar,/home/lzzhang/bigdata/flink-bin-download/zeppelin-0.9.0-bin-all/lib/postgresql-42.2.18.jar,/home/lzzhang/bigdata/flink-bin-download/zeppelin-0.9.0-bin-all/lib/flink-sql-connector-kafka_2.11-1.11.2.jar,/home/lzzhang/bigdata/flink-bin-download/zeppelin-0.9.0-bin-all/lib/flink-connector-clickhouse-1.11.0.jar"
+zeppelin_flink_execute_jars: "MySQL:/home/lzzhang/bigdata/flink-bin-download/zeppelin-0.9.0-bin-all/lib/flink-connector-jdbc_2.11-1.11.2.jar,/home/lzzhang/bigdata/flink-bin-download/zeppelin-0.9.0-bin-all/lib/mysql-connector-java-8.0.21.jar;PostgreSQL:/home/lzzhang/bigdata/flink-bin-download/zeppelin-0.9.0-bin-all/lib/flink-connector-jdbc_2.11-1.11.2.jar,/home/lzzhang/bigdata/flink-bin-download/zeppelin-0.9.0-bin-all/lib/postgresql-42.2.18.jar;Kafka:/home/lzzhang/bigdata/flink-bin-download/zeppelin-0.9.0-bin-all/lib/flink-sql-connector-kafka_2.11-1.11.2.jar;ClickHouse:/home/lzzhang/bigdata/flink-bin-download/zeppelin-0.9.0-bin-all/lib/flink-connector-clickhouse-1.11.0.jar"
 
 sourcemanager_server: "127.0.0.1:50001"
 

@@ -266,11 +266,19 @@ func (ex *JobmanagerExecutor) RunJobUtile(ctx context.Context, ID string, Worksp
 	}
 	watchInfo.NoteID = info.NoteID
 
+	var confErr error
 	if engineType == constants.EngineTypeFlink {
-		zeplinConf = GenerateFlinkConf(ex.httpClient.ZeppelinFlinkHome, ex.httpClient.ZeppelinFlinkExecuteJars, engineHost, enginePort, NodeType)
+		zeplinConf, err = GenerateFlinkConf(ex.sourceClient, Depends, ex.httpClient.ZeppelinFlinkHome, ex.httpClient.ZeppelinFlinkExecuteJars, engineHost, enginePort, NodeType)
+		if err != nil {
+			confErr = err // if don't CreateParagraph, could not delete the note. it maybe a zeppelin bug.
+		}
 	}
 	Pa.Conf, err = ex.httpClient.CreateParagraph(info.NoteID, 0, "JobConf", zeplinConf)
 	if err != nil {
+		return
+	}
+	if confErr != nil {
+		err = confErr
 		return
 	}
 

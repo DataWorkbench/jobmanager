@@ -175,13 +175,13 @@ func TestJobManagerGRPC_RunJobManual(t *testing.T) {
 
 	//_, err = client.RunJob(ctx, &mspdpg)
 	//require.Nil(t, err, "%+v", err)
-	//
+
 	//_, err = client.RunJob(ctx, &mc)
 	//require.Nil(t, err, "%+v", err)
-	//
+
 	//_, err = client.RunJob(ctx, &mw)
 	//require.Nil(t, err, "%+v", err)
-	//
+
 	//_, err = client.RunJob(ctx, &jar)
 	//require.Nil(t, err, "%+v", err)
 }

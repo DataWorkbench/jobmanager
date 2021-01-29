@@ -9,21 +9,27 @@ import (
 	"github.com/DataWorkbench/common/constants"
 )
 
-func GenerateFlinkConf(flinkHome string, flinkExecJars string, engineHost string, enginePort string, nodeType int32) (o string) {
+func GenerateFlinkConf(client SourceClient, depends string, flinkHome string, flinkExecJars string, engineHost string, enginePort string, nodeType int32) (conf string, err error) {
 	if nodeType == constants.NodeTypeFlinkSSQL {
+		var execJars string
 		title := "%flink.conf\n\n"
 		home := "FLINK_HOME " + flinkHome + "\n"
 		mode := "flink.execution.mode remote\n"
 		host := "flink.execution.remote.host	" + engineHost + "\n"
 		port := "flink.execution.remote.port	" + enginePort + "\n"
-		jars := "flink.execution.jars " + flinkExecJars + "\n"
+		execJars, err = GenerateFlinkExecuteJars(flinkExecJars, client, depends)
+		if err != nil {
+			conf = "%flink.conf\n\n"
+			return
+		}
+		jars := "flink.execution.jars " + execJars + "\n"
 		others := "zeppelin.flink.concurrentBatchSql.max 1000000\nzeppelin.flink.concurrentStreamSql.max 1000000\n"
 
-		return title + home + mode + host + port + jars + others
+		conf = title + home + mode + host + port + jars + others
 	} else if nodeType == constants.NodeTypeFlinkJob {
 		title := "%sh.conf\n\n"
 		timeOut := "shell.command.timeout.millisecs    315360000000" // 1000×60×60×24×365×10 10years
-		return title + timeOut
+		conf = title + timeOut
 	}
 	return
 }
@@ -324,6 +330,58 @@ func GetS3Info(client SourceClient, depends string) (s3info constants.SourceS3Pa
 				err = fmt.Errorf("only allow one s3 sourcemanger in a job, all accesskey secretkey endpoint is same")
 				return
 			}
+		}
+	}
+	return
+}
+
+func GenerateFlinkExecuteJars(jars string, client SourceClient, depends string) (executeJars string, err error) {
+	sourceTypes, err := GetSourceTypes(client, depends)
+
+	for _, jar := range strings.Split(strings.Replace(jars, " ", "", -1), ";") {
+		sourceType := strings.Split(jar, ":")[0]
+		executeJar := strings.Split(jar, ":")[1]
+
+		for _, jobSourceType := range sourceTypes {
+			if sourceType == jobSourceType {
+				if len(executeJars) > 0 {
+					executeJars += ","
+				}
+				executeJars += executeJar
+			}
+		}
+	}
+	return
+}
+
+func GetSourceTypes(client SourceClient, depends string) (sourcetypes []string, err error) {
+	var ssql constants.FlinkSSQL
+
+	if err = json.Unmarshal([]byte(depends), &ssql); err != nil {
+		return
+	}
+
+	for _, table := range ssql.Tables {
+		sourceID, _, _, errTmp := client.DescribeSourceTable(table)
+		if errTmp != nil {
+			err = errTmp
+			return
+		}
+		sourceType, _, errTmp := client.DescribeSourceManager(sourceID)
+		if errTmp != nil {
+			err = errTmp
+			return
+		}
+
+		find := false
+		for _, save := range sourcetypes {
+			if save == sourceType {
+				find = true
+				break
+			}
+		}
+		if find == false {
+			sourcetypes = append(sourcetypes, sourceType)
 		}
 	}
 	return
