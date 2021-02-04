@@ -51,20 +51,6 @@ type JobmanagerInfo struct {
 	SpaceID    string `gorm:"column:spaceid;"`
 }
 
-type EnginOptions struct {
-	JobID       string  `json:"jobid"`
-	WorkspaceID string  `json:"workspaceid"`
-	Parallelism int32   `json:"parallelism"`
-	JobMem      int32   `json:"job_mem"` // in MB
-	JobCpu      float32 `json:"job_cpu"`
-	TaskCpu     float32 `json:"task_cpu"`
-	TaskMem     int32   `json:"task_mem"` // in MB
-	TaskNum     int32   `json:"task_num"`
-	AccessKey   string  `json:"accesskey"`
-	SecretKey   string  `json:"secretkey"`
-	EndPoint    string  `json:"endpoint"`
-}
-
 type JobWatchInfo struct {
 	ID           string
 	NoteID       string
@@ -196,9 +182,10 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 
 func (ex *JobmanagerExecutor) RunJobUtile(ctx context.Context, ID string, WorkspaceID string, NodeType int32, Depends string) (err error, watchInfo JobWatchInfo) {
 	var (
-		info       JobmanagerInfo
-		Pa         ParagraphsInfo
-		engineOpts EnginOptions
+		info           JobmanagerInfo
+		Pa             ParagraphsInfo
+		engineRequest  constants.EngineRequestOptions
+		engineResponse constants.EngineResponseOptions
 
 		zeplinConf    string
 		zeplinDepends string
@@ -214,8 +201,8 @@ func (ex *JobmanagerExecutor) RunJobUtile(ctx context.Context, ID string, Worksp
 	info.Message = JobRunning
 	info.SpaceID = WorkspaceID
 
-	engineOpts.JobID = info.ID
-	engineOpts.WorkspaceID = WorkspaceID
+	engineRequest.JobID = info.ID
+	engineRequest.WorkspaceID = WorkspaceID
 
 	if NodeType == constants.NodeTypeFlinkSSQL {
 		var v constants.FlinkSSQL
@@ -227,36 +214,39 @@ func (ex *JobmanagerExecutor) RunJobUtile(ctx context.Context, ID string, Worksp
 		if s3info, err = GetS3Info(ex.sourceClient, Depends); err != nil {
 			return
 		}
-		engineOpts.Parallelism = v.Parallelism
-		engineOpts.JobCpu = v.JobCpu
-		engineOpts.JobMem = v.JobMem
-		engineOpts.TaskCpu = v.TaskCpu
-		engineOpts.TaskMem = v.TaskMem
-		engineOpts.TaskNum = v.TaskNum
-		engineOpts.AccessKey = s3info.AccessKey
-		engineOpts.SecretKey = s3info.SecretKey
-		engineOpts.EndPoint = s3info.EndPoint
+		engineRequest.Parallelism = v.Parallelism
+		engineRequest.JobCpu = v.JobCpu
+		engineRequest.JobMem = v.JobMem
+		engineRequest.TaskCpu = v.TaskCpu
+		engineRequest.TaskMem = v.TaskMem
+		engineRequest.TaskNum = v.TaskNum
+		engineRequest.AccessKey = s3info.AccessKey
+		engineRequest.SecretKey = s3info.SecretKey
+		engineRequest.EndPoint = s3info.EndPoint
 	} else if NodeType == constants.NodeTypeFlinkJob {
 		var v constants.FlinkJob
 		if err = json.Unmarshal([]byte(Depends), &v); err != nil {
 			return
 		}
-		engineOpts.Parallelism = v.Parallelism
-		engineOpts.JobCpu = v.JobCpu
-		engineOpts.JobMem = v.JobMem
-		engineOpts.TaskCpu = v.TaskCpu
-		engineOpts.TaskMem = v.TaskMem
-		engineOpts.TaskNum = v.TaskNum
-		engineOpts.AccessKey = v.AccessKey
-		engineOpts.SecretKey = v.SecretKey
-		engineOpts.EndPoint = v.EndPoint
+		engineRequest.Parallelism = v.Parallelism
+		engineRequest.JobCpu = v.JobCpu
+		engineRequest.JobMem = v.JobMem
+		engineRequest.TaskCpu = v.TaskCpu
+		engineRequest.TaskMem = v.TaskMem
+		engineRequest.TaskNum = v.TaskNum
+		engineRequest.AccessKey = v.AccessKey
+		engineRequest.SecretKey = v.SecretKey
+		engineRequest.EndPoint = v.EndPoint
 	}
 
-	engineOptsByte, _ := json.Marshal(engineOpts)
-	ex.logger.Debug().String("engine options", string(engineOptsByte)).Fire()
-	engineType, engineHost, enginePort, _, tmperr := GetEngine(string(engineOptsByte))
+	engineRequestByte, _ := json.Marshal(engineRequest)
+	ex.logger.Debug().String("engine options", string(engineRequestByte)).Fire()
+	engineResponseString, tmperr := GetEngine(string(engineRequestByte))
 	if tmperr != nil {
 		err = tmperr
+		return
+	}
+	if err = json.Unmarshal([]byte(engineResponseString), &engineResponse); err != nil {
 		return
 	}
 
@@ -267,8 +257,8 @@ func (ex *JobmanagerExecutor) RunJobUtile(ctx context.Context, ID string, Worksp
 	watchInfo.NoteID = info.NoteID
 
 	var confErr error
-	if engineType == constants.EngineTypeFlink {
-		zeplinConf, err = GenerateFlinkConf(ex.sourceClient, Depends, ex.httpClient.ZeppelinFlinkHome, ex.httpClient.ZeppelinFlinkExecuteJars, engineHost, enginePort, NodeType)
+	if engineResponse.EngineType == constants.EngineTypeFlink {
+		zeplinConf, err = GenerateFlinkConf(ex.sourceClient, Depends, ex.httpClient.ZeppelinFlinkHome, ex.httpClient.ZeppelinFlinkExecuteJars, engineResponse.EngineHost, engineResponse.EnginePort, NodeType)
 		if err != nil {
 			confErr = err // if don't CreateParagraph, could not delete the note. it maybe a zeppelin bug.
 		}
@@ -283,8 +273,8 @@ func (ex *JobmanagerExecutor) RunJobUtile(ctx context.Context, ID string, Worksp
 	}
 
 	// depend and mainrun text
-	if engineType == constants.EngineTypeFlink {
-		zeplinDepends, zeplinMainRun, resources, err = GenerateFlinkJob(ex.sourceClient, ex.httpClient.ZeppelinFlinkHome, engineHost+":"+enginePort, NodeType, Depends)
+	if engineResponse.EngineType == constants.EngineTypeFlink {
+		zeplinDepends, zeplinMainRun, resources, err = GenerateFlinkJob(ex.sourceClient, ex.httpClient.ZeppelinFlinkHome, engineResponse.EngineHost+":"+engineResponse.EnginePort, NodeType, Depends)
 	}
 	if err != nil {
 		return

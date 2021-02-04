@@ -1,16 +1,23 @@
 package executor
 
 import (
+	"encoding/json"
 	"fmt"
+
+	"github.com/DataWorkbench/common/constants"
 )
 
-func GetEngine(options string) (engineType string, engineHost string, enginePort string, engineOption string, err error) {
-	engineType = "Flink"
-	//engineHost = "127.0.0.1"
-	engineHost = "flinkjobmanager"
-	enginePort = "8081"
-	engineOption = ""
-	fmt.Println("get engine")
+func GetEngine(options string) (respstring string, err error) {
+	var resp constants.EngineResponseOptions
+
+	resp.EngineType = "Flink"
+	//resp.EngineHost = "127.0.0.1"
+	resp.EngineHost = "flinkjobmanager"
+	resp.EnginePort = "8081"
+
+	respbyte, _ := json.Marshal(resp)
+	respstring = string(respbyte)
+
 	return
 }
 
