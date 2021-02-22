@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/DataWorkbench/common/constants"
@@ -24,6 +25,9 @@ const (
 	JobAbort            = "job abort"
 	JobRunning          = "job running"
 	jobError            = "error happend"
+	Quote               = constants.MainRunQuote
+	FlinkHostQuote      = Quote + "FLINK_HOST" + Quote
+	FlinkPortQuote      = Quote + "FLINK_PORT" + Quote
 
 	JobmanagerTableName = "jobmanager"
 	MaxStatusFailedNum  = 100
@@ -37,6 +41,14 @@ type ParagraphsInfo struct {
 	Conf    string `json:"conf"`
 	Depends string `json:"depends"`
 	MainRun string `json:"mainrun"`
+}
+
+type JobParserInfo struct {
+	ZeppelinConf    string
+	ZeppelinDepends string
+	ZeppelinMainRun string
+	S3info          constants.SourceS3Params
+	resources       JobResources
 }
 
 type JobmanagerInfo struct {
@@ -149,9 +161,6 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 	err, watchInfo = ex.RunJobUtile(ctx, ID, WorkspaceID, NodeType, Depends)
 	if err != nil {
 		ex.logger.Error().Msg("can't run job").String("jobid", ID).Error("", err).Fire()
-		if watchInfo.NoteID != "" {
-			_ = ex.httpClient.DeleteNote(watchInfo.NoteID)
-		}
 		rep.Status = StatusFailed
 		rep.Message = err.Error()
 		return
@@ -165,8 +174,10 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 	}
 
 	// depend
-	if err = ex.httpClient.RunParagraphSync(watchInfo.NoteID, watchInfo.ParagraphIDs.Depends); err != nil {
-		return
+	if watchInfo.ParagraphIDs.Depends != "" {
+		if err = ex.httpClient.RunParagraphSync(watchInfo.NoteID, watchInfo.ParagraphIDs.Depends); err != nil {
+			return
+		}
 	}
 
 	// main fun
@@ -186,32 +197,31 @@ func (ex *JobmanagerExecutor) RunJobUtile(ctx context.Context, ID string, Worksp
 		Pa             ParagraphsInfo
 		engineRequest  constants.EngineRequestOptions
 		engineResponse constants.EngineResponseOptions
-
-		zeplinConf    string
-		zeplinDepends string
-		zeplinMainRun string
-		resources     JobResources
+		jobInfo        JobParserInfo
+		engineCreated  bool
 	)
 
-	info.ID = ID
-	watchInfo.ID = info.ID
-	info.CreateTime = time.Now().Format("2006-01-02 15:04:05")
-	info.UpdateTime = info.CreateTime
-	info.Status = StatusRunningString
-	info.Message = JobRunning
-	info.SpaceID = WorkspaceID
+	defer func() {
+		if err != nil {
+			if engineCreated == true {
+				FreeEngine(ID)
+			}
+			if watchInfo.NoteID != "" {
+				_ = ex.httpClient.DeleteNote(watchInfo.NoteID)
+			}
+		}
+	}()
 
-	engineRequest.JobID = info.ID
+	if err, jobInfo = JobParserFlink(ex.sourceClient, Depends, ex.httpClient.ZeppelinFlinkHome, ex.httpClient.ZeppelinFlinkExecuteJars, NodeType); err != nil {
+		return
+	}
+
+	engineRequest.JobID = ID
 	engineRequest.WorkspaceID = WorkspaceID
-
 	if NodeType == constants.NodeTypeFlinkSSQL {
 		var v constants.FlinkSSQL
-		var s3info constants.SourceS3Params
 
 		if err = json.Unmarshal([]byte(Depends), &v); err != nil {
-			return
-		}
-		if s3info, err = GetS3Info(ex.sourceClient, Depends); err != nil {
 			return
 		}
 		engineRequest.Parallelism = v.Parallelism
@@ -220,11 +230,12 @@ func (ex *JobmanagerExecutor) RunJobUtile(ctx context.Context, ID string, Worksp
 		engineRequest.TaskCpu = v.TaskCpu
 		engineRequest.TaskMem = v.TaskMem
 		engineRequest.TaskNum = v.TaskNum
-		engineRequest.AccessKey = s3info.AccessKey
-		engineRequest.SecretKey = s3info.SecretKey
-		engineRequest.EndPoint = s3info.EndPoint
+		engineRequest.AccessKey = jobInfo.S3info.AccessKey
+		engineRequest.SecretKey = jobInfo.S3info.SecretKey
+		engineRequest.EndPoint = jobInfo.S3info.EndPoint
 	} else if NodeType == constants.NodeTypeFlinkJob {
 		var v constants.FlinkJob
+
 		if err = json.Unmarshal([]byte(Depends), &v); err != nil {
 			return
 		}
@@ -246,59 +257,74 @@ func (ex *JobmanagerExecutor) RunJobUtile(ctx context.Context, ID string, Worksp
 		err = tmperr
 		return
 	}
+	engineCreated = true
 	if err = json.Unmarshal([]byte(engineResponseString), &engineResponse); err != nil {
 		return
 	}
+	//if engineResponse.EngineType != constants.EngineTypeFlink {
+	//	err = fmt.Errorf("don't support the engine %s", engineResponse.EngineType)
+	//	return
+	//}
 
+	jobInfo.ZeppelinConf = strings.Replace(jobInfo.ZeppelinConf, FlinkHostQuote, engineResponse.EngineHost, -1)
+	jobInfo.ZeppelinConf = strings.Replace(jobInfo.ZeppelinConf, FlinkPortQuote, engineResponse.EnginePort, -1)
+	jobInfo.ZeppelinMainRun = strings.Replace(jobInfo.ZeppelinMainRun, FlinkHostQuote, engineResponse.EngineHost, -1)
+	jobInfo.ZeppelinMainRun = strings.Replace(jobInfo.ZeppelinMainRun, FlinkPortQuote, engineResponse.EnginePort, -1)
+
+	resourcesByte, _ := json.Marshal(jobInfo.resources)
+	info.Resources = string(resourcesByte)
+	info.ID = ID
+	info.CreateTime = time.Now().Format("2006-01-02 15:04:05")
+	info.UpdateTime = info.CreateTime
+	info.Status = StatusRunningString
+	info.Message = JobRunning
+	info.SpaceID = WorkspaceID
 	info.NoteID, err = ex.httpClient.CreateNote(ID)
 	if err != nil {
 		return
 	}
+	watchInfo.ID = info.ID
 	watchInfo.NoteID = info.NoteID
+	watchInfo.Resources = jobInfo.resources
 
-	var confErr error
-	if engineResponse.EngineType == constants.EngineTypeFlink {
-		zeplinConf, err = GenerateFlinkConf(ex.sourceClient, Depends, ex.httpClient.ZeppelinFlinkHome, ex.httpClient.ZeppelinFlinkExecuteJars, engineResponse.EngineHost, engineResponse.EnginePort, NodeType)
-		if err != nil {
-			confErr = err // if don't CreateParagraph, could not delete the note. it maybe a zeppelin bug.
-		}
-	}
-	Pa.Conf, err = ex.httpClient.CreateParagraph(info.NoteID, 0, "JobConf", zeplinConf)
-	if err != nil {
-		return
-	}
-	if confErr != nil {
-		err = confErr
-		return
-	}
-
-	// depend and mainrun text
-	if engineResponse.EngineType == constants.EngineTypeFlink {
-		zeplinDepends, zeplinMainRun, resources, err = GenerateFlinkJob(ex.sourceClient, ex.httpClient.ZeppelinFlinkHome, engineResponse.EngineHost+":"+engineResponse.EnginePort, NodeType, Depends)
-	}
-	if err != nil {
-		return
-	}
-	resourcesByte, _ := json.Marshal(resources)
-	info.Resources = string(resourcesByte)
-	watchInfo.Resources = resources
-
-	Pa.Depends, err = ex.httpClient.CreateParagraph(info.NoteID, 1, "JobDepends", zeplinDepends)
+	Pa.Conf, err = ex.httpClient.CreateParagraph(info.NoteID, 0, "JobConf", jobInfo.ZeppelinConf)
 	if err != nil {
 		return
 	}
 
-	Pa.MainRun, err = ex.httpClient.CreateParagraph(info.NoteID, 2, "JobMainrun", zeplinMainRun)
+	Pa.Depends, err = ex.httpClient.CreateParagraph(info.NoteID, 1, "JobDepends", jobInfo.ZeppelinDepends)
 	if err != nil {
+		return
+	}
+	if jobInfo.ZeppelinDepends == "" {
+		Pa.Depends = ""
+	}
+	ex.logger.Debug().Any("2aaaaaaaaaaaaaaaaaaaaaa", jobInfo).Fire()
+
+	Pa.MainRun, err = ex.httpClient.CreateParagraph(info.NoteID, 2, "JobMainrun", jobInfo.ZeppelinMainRun)
+	if err != nil {
+		ex.logger.Debug().Any("3aaaaaaaaaaaaaaaaaaaaaa", jobInfo).Fire()
 		return
 	}
 
 	PaByte, _ := json.Marshal(Pa)
 	info.Paragraph = string(PaByte)
 	watchInfo.ParagraphIDs = Pa
+	ex.logger.Debug().Any("1aaaaaaaaaaaaaaaaaaaaaa", jobInfo).Fire()
 
 	db := ex.db.WithContext(ctx)
 	err = db.Create(info).Error
+	ex.logger.Debug().Any("4aaaaaaaaaaaaaaaaaaaaaa", jobInfo).Fire()
+	return
+}
+
+func GetNextParagraphIDValid(job jobQueueType) (r jobQueueType) {
+Retry:
+	r = GetNextParagraphID(job)
+	if r.ParagraphID == "" && r.RunEnd == false {
+		job = r
+		goto Retry
+	}
 	return
 }
 
@@ -360,7 +386,7 @@ func (ex *JobmanagerExecutor) WatchJob(ctx context.Context) {
 						}
 					}
 					if status == ParagraphFinish {
-						job = GetNextParagraphID(job)
+						job = GetNextParagraphIDValid(job)
 						if job.RunEnd == true {
 							if err = ex.ModifyStatus(ctx, job.Job.ID, StatusFinish, JobSuccess, job.Job.Resources); err != nil {
 								ex.logger.Error().Msg("can't change the job status to finish").String("jobid", job.Job.ID).Fire()

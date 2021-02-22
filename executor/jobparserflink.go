@@ -9,43 +9,46 @@ import (
 	"github.com/DataWorkbench/common/constants"
 )
 
-func GenerateFlinkConf(client SourceClient, depends string, flinkHome string, flinkExecJars string, engineHost string, enginePort string, nodeType int32) (conf string, err error) {
-	if nodeType == constants.NodeTypeFlinkSSQL {
-		var execJars string
-		title := "%flink.conf\n\n"
-		home := "FLINK_HOME " + flinkHome + "\n"
-		mode := "flink.execution.mode remote\n"
-		host := "flink.execution.remote.host	" + engineHost + "\n"
-		port := "flink.execution.remote.port	" + enginePort + "\n"
-		execJars, err = GenerateFlinkExecuteJars(flinkExecJars, client, depends)
-		if err != nil {
-			conf = "%flink.conf\n\n"
-			return
-		}
-		jars := "flink.execution.jars " + execJars + "\n"
-		others := "zeppelin.flink.concurrentBatchSql.max 1000000\nzeppelin.flink.concurrentStreamSql.max 1000000\n"
+//      ZeppelinConf    string
+//      ZeppelinDepends string
+//      ZeppelinMainRun string
+//      S3info          constants.SourceS3Params
+//      ExecuteJars     string
+//      resources       JobResources
 
-		conf = title + home + mode + host + port + jars + others
-	} else if nodeType == constants.NodeTypeFlinkJob {
-		title := "%sh.conf\n\n"
-		timeOut := "shell.command.timeout.millisecs    315360000000" // 1000×60×60×24×365×10 10years
-		conf = title + timeOut
-	}
-	return
-}
-
-func GenerateFlinkJob(client SourceClient, flinkHome string, flinkAddr string, nodeType int32, depends string) (dependsText string, mainRunText string, resources JobResources, err error) {
+func JobParserFlink(client SourceClient, depends string, flinkHome string, flinkExecJars string, nodeType int32) (err error, jobInfo JobParserInfo) {
 	var (
-		title      string
 		tablesName map[string]string
 		ssql       constants.FlinkSSQL
 		job        constants.FlinkJob
+		title      string
 	)
 
-	tablesName = make(map[string]string)
-
+	// conf
 	if nodeType == constants.NodeTypeFlinkSSQL {
-		var property string
+		jobInfo.ZeppelinConf += "%flink.conf\n\n"
+		jobInfo.ZeppelinConf += "FLINK_HOME " + flinkHome + "\n"
+		jobInfo.ZeppelinConf += "flink.execution.mode remote\n"
+		jobInfo.ZeppelinConf += "flink.execution.remote.host	" + FlinkHostQuote + "\n"
+		jobInfo.ZeppelinConf += "flink.execution.remote.port	" + FlinkPortQuote + "\n"
+		jobInfo.ZeppelinConf += "zeppelin.flink.concurrentBatchSql.max 1000000\nzeppelin.flink.concurrentStreamSql.max 1000000\n"
+	} else if nodeType == constants.NodeTypeFlinkJob {
+		jobInfo.ZeppelinConf += "%sh.conf\n\n"
+		jobInfo.ZeppelinConf += "shell.command.timeout.millisecs    315360000000" // 1000×60×60×24×365×10 10years
+	} else {
+		err = fmt.Errorf("flink don't support the job type %d", nodeType)
+		return
+	}
+
+	// depend
+	if nodeType == constants.NodeTypeFlinkSSQL {
+		var (
+			property    string
+			sourcetypes []string
+			executeJars string
+		)
+
+		tablesName = make(map[string]string)
 		if err = json.Unmarshal([]byte(depends), &ssql); err != nil {
 			return
 		}
@@ -54,8 +57,231 @@ func GenerateFlinkJob(client SourceClient, flinkHome string, flinkAddr string, n
 		} else {
 			property = ""
 		}
-
 		title = "%flink.ssql" + property + "\n\n"
+		jobInfo.ZeppelinDepends += title
+
+		for _, table := range ssql.Tables {
+			sourceID, tableName, tableUrl, errTmp := client.DescribeSourceTable(table)
+			if errTmp != nil {
+				err = errTmp
+				return
+			}
+			sourceType, ManagerUrl, errTmp := client.DescribeSourceManager(sourceID)
+			if errTmp != nil {
+				err = errTmp
+				return
+			}
+
+			if sourceType == constants.SourceTypeS3 {
+				var m constants.SourceS3Params
+
+				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
+					return
+				}
+				if jobInfo.S3info.AccessKey == "" {
+					jobInfo.S3info.AccessKey = m.AccessKey
+					jobInfo.S3info.SecretKey = m.SecretKey
+					jobInfo.S3info.EndPoint = m.EndPoint
+				} else if jobInfo.S3info.AccessKey != m.AccessKey || jobInfo.S3info.SecretKey != m.SecretKey || jobInfo.S3info.EndPoint != m.EndPoint {
+					err = fmt.Errorf("only allow one s3 sourcemanger in a job, all accesskey secretkey endpoint is same")
+					return
+				}
+			}
+
+			find := false
+			for _, save := range sourcetypes {
+				if save == sourceType {
+					find = true
+					break
+				}
+			}
+			if find == false {
+				sourcetypes = append(sourcetypes, sourceType)
+			}
+
+			tablesName[table] = tableName
+			jobInfo.ZeppelinDepends += "drop table if exists " + tableName + ";\n"
+			jobInfo.ZeppelinDepends += "create table " + tableName + "\n"
+
+			if sourceType == constants.SourceTypeMysql {
+				var m constants.SourceMysqlParams
+				var t constants.FlinkTableDefineMysql
+
+				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
+					return
+				}
+				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
+					return
+				}
+				jobInfo.ZeppelinDepends += "("
+				first := true
+				for _, column := range t.SqlColumn {
+					if first == true {
+						jobInfo.ZeppelinDepends += column
+						first = false
+					} else {
+						jobInfo.ZeppelinDepends += "," + column
+					}
+				}
+				jobInfo.ZeppelinDepends += ") WITH (\n"
+				jobInfo.ZeppelinDepends += "'connector' = 'jdbc',\n"
+				jobInfo.ZeppelinDepends += "'url' = 'jdbc:" + "mysql" + "://" + m.Host + ":" + fmt.Sprintf("%d", m.Port) + "/" + m.Database + "',\n"
+				jobInfo.ZeppelinDepends += "'table-name' = '" + tableName + "',\n"
+				jobInfo.ZeppelinDepends += "'username' = '" + m.User + "',\n"
+				jobInfo.ZeppelinDepends += "'password' = '" + m.Password + "'\n"
+				for _, opt := range m.ConnectorOptions {
+					jobInfo.ZeppelinDepends += "," + opt + "\n"
+				}
+				for _, opt := range t.ConnectorOptions {
+					jobInfo.ZeppelinDepends += "," + opt + "\n"
+				}
+			} else if sourceType == constants.SourceTypePostgreSQL {
+				var m constants.SourcePostgreSQLParams
+				var t constants.FlinkTableDefinePostgreSQL
+
+				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
+					return
+				}
+				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
+					return
+				}
+				jobInfo.ZeppelinDepends += "("
+				first := true
+				for _, column := range t.SqlColumn {
+					if first == true {
+						jobInfo.ZeppelinDepends += column
+						first = false
+					} else {
+						jobInfo.ZeppelinDepends += "," + column
+					}
+				}
+				jobInfo.ZeppelinDepends += ") WITH (\n"
+				jobInfo.ZeppelinDepends += "'connector' = 'jdbc',\n"
+				jobInfo.ZeppelinDepends += "'url' = 'jdbc:" + "postgresql" + "://" + m.Host + ":" + fmt.Sprintf("%d", m.Port) + "/" + m.Database + "',\n"
+				jobInfo.ZeppelinDepends += "'table-name' = '" + tableName + "',\n"
+				jobInfo.ZeppelinDepends += "'username' = '" + m.User + "',\n"
+				jobInfo.ZeppelinDepends += "'password' = '" + m.Password + "'\n"
+				for _, opt := range m.ConnectorOptions {
+					jobInfo.ZeppelinDepends += "," + opt + "\n"
+				}
+				for _, opt := range t.ConnectorOptions {
+					jobInfo.ZeppelinDepends += "," + opt + "\n"
+				}
+			} else if sourceType == constants.SourceTypeClickHouse {
+				var m constants.SourceClickHouseParams
+				var t constants.FlinkTableDefineClickHouse
+
+				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
+					return
+				}
+				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
+					return
+				}
+				jobInfo.ZeppelinDepends += "("
+				first := true
+				for _, column := range t.SqlColumn {
+					if first == true {
+						jobInfo.ZeppelinDepends += column
+						first = false
+					} else {
+						jobInfo.ZeppelinDepends += "," + column
+					}
+				}
+				jobInfo.ZeppelinDepends += ") WITH (\n"
+				jobInfo.ZeppelinDepends += "'connector' = 'clickhouse',\n"
+				jobInfo.ZeppelinDepends += "'url' = 'clickhouse://" + m.Host + ":" + fmt.Sprintf("%d", m.Port) + "',\n"
+				jobInfo.ZeppelinDepends += "'table-name' = '" + tableName + "',\n"
+				jobInfo.ZeppelinDepends += "'username' = '" + m.User + "',\n"
+				jobInfo.ZeppelinDepends += "'database-name' = '" + m.Database + "',\n"
+				jobInfo.ZeppelinDepends += "'password' = '" + m.Password + "'\n"
+				for _, opt := range m.ConnectorOptions {
+					jobInfo.ZeppelinDepends += "," + opt + "\n"
+				}
+				for _, opt := range t.ConnectorOptions {
+					jobInfo.ZeppelinDepends += "," + opt + "\n"
+				}
+			} else if sourceType == constants.SourceTypeKafka {
+				var m constants.SourceKafkaParams
+				var t constants.FlinkTableDefineKafka
+
+				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
+					return
+				}
+				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
+					return
+				}
+				jobInfo.ZeppelinDepends += "("
+				first := true
+				for _, column := range t.SqlColumn {
+					if first == true {
+						jobInfo.ZeppelinDepends += column
+						first = false
+					} else {
+						jobInfo.ZeppelinDepends += "," + column
+					}
+				}
+				jobInfo.ZeppelinDepends += ") WITH (\n"
+
+				jobInfo.ZeppelinDepends += "'connector' = 'kafka',\n"
+				jobInfo.ZeppelinDepends += "'topic' = '" + t.Topic + "',\n"
+				jobInfo.ZeppelinDepends += "'properties.bootstrap.servers' = '" + m.Host + ":" + fmt.Sprintf("%d", m.Port) + "',\n"
+				jobInfo.ZeppelinDepends += "'format' = '" + t.Format + "'\n"
+				for _, opt := range m.ConnectorOptions {
+					jobInfo.ZeppelinDepends += "," + opt + "\n"
+				}
+				for _, opt := range t.ConnectorOptions {
+					jobInfo.ZeppelinDepends += "," + opt + "\n"
+				}
+			} else if sourceType == constants.SourceTypeS3 {
+				var m constants.SourceS3Params
+				var t constants.FlinkTableDefineS3
+
+				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
+					return
+				}
+				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
+					return
+				}
+				jobInfo.ZeppelinDepends += "("
+				first := true
+				for _, column := range t.SqlColumn {
+					if first == true {
+						jobInfo.ZeppelinDepends += column
+						first = false
+					} else {
+						jobInfo.ZeppelinDepends += "," + column
+					}
+				}
+				jobInfo.ZeppelinDepends += ") WITH (\n"
+
+				jobInfo.ZeppelinDepends += "'connector' = 'filesystem',\n"
+				jobInfo.ZeppelinDepends += "'path' = '" + t.Path + "',\n"
+				jobInfo.ZeppelinDepends += "'format' = '" + t.Format + "'\n"
+				for _, opt := range t.ConnectorOptions {
+					jobInfo.ZeppelinDepends += "," + opt + "\n"
+				}
+			} else {
+				err = fmt.Errorf("don't support this source mananger %s", sourceType)
+				return
+			}
+
+			jobInfo.ZeppelinDepends += ");\n\n\n"
+		}
+
+		for _, jar := range strings.Split(strings.Replace(flinkExecJars, " ", "", -1), ";") {
+			sourceType := strings.Split(jar, ":")[0]
+			executeJar := strings.Split(jar, ":")[1]
+
+			for _, jobSourceType := range sourcetypes {
+				if sourceType == jobSourceType {
+					if len(executeJars) > 0 {
+						executeJars += ","
+					}
+					executeJars += executeJar
+				}
+			}
+		}
+		jobInfo.ZeppelinConf += "flink.execution.jars " + executeJars + "\n"
 	} else if nodeType == constants.NodeTypeFlinkJob {
 		var checkv = regexp.MustCompile(`^[a-zA-Z0-9_/. ]*$`).MatchString
 
@@ -71,207 +297,17 @@ func GenerateFlinkJob(client SourceClient, flinkHome string, flinkAddr string, n
 			err = fmt.Errorf("only ^[a-zA-Z0-9_/. ]*$ is allow in jarentry")
 			return
 		}
-
 		title = "%sh\n\n"
-	} else {
-		err = fmt.Errorf("flink don't support the job type %d", nodeType)
-		return
-	}
-
-	dependsText += title
-	if nodeType == constants.NodeTypeFlinkSSQL {
-		for _, table := range ssql.Tables {
-			sourceID, tableName, tableUrl, errTmp := client.DescribeSourceTable(table)
-			if errTmp != nil {
-				err = errTmp
-				return
-			}
-			sourceType, ManagerUrl, errTmp := client.DescribeSourceManager(sourceID)
-			if errTmp != nil {
-				err = errTmp
-				return
-			}
-
-			tablesName[table] = tableName
-			dependsText += "drop table if exists " + tableName + ";\n"
-			dependsText += "create table " + tableName + "\n"
-
-			if sourceType == constants.SourceTypeMysql {
-				var m constants.SourceMysqlParams
-				var t constants.FlinkTableDefineMysql
-
-				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
-					return
-				}
-				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
-					return
-				}
-				dependsText += "("
-				first := true
-				for _, column := range t.SqlColumn {
-					if first == true {
-						dependsText += column
-						first = false
-					} else {
-						dependsText += "," + column
-					}
-				}
-				dependsText += ") WITH (\n"
-				dependsText += "'connector' = 'jdbc',\n"
-				dependsText += "'url' = 'jdbc:" + "mysql" + "://" + m.Host + ":" + fmt.Sprintf("%d", m.Port) + "/" + m.Database + "',\n"
-				dependsText += "'table-name' = '" + tableName + "',\n"
-				dependsText += "'username' = '" + m.User + "',\n"
-				dependsText += "'password' = '" + m.Password + "'\n"
-				for _, opt := range m.ConnectorOptions {
-					dependsText += "," + opt + "\n"
-				}
-				for _, opt := range t.ConnectorOptions {
-					dependsText += "," + opt + "\n"
-				}
-			} else if sourceType == constants.SourceTypePostgreSQL {
-				var m constants.SourcePostgreSQLParams
-				var t constants.FlinkTableDefinePostgreSQL
-
-				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
-					return
-				}
-				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
-					return
-				}
-				dependsText += "("
-				first := true
-				for _, column := range t.SqlColumn {
-					if first == true {
-						dependsText += column
-						first = false
-					} else {
-						dependsText += "," + column
-					}
-				}
-				dependsText += ") WITH (\n"
-				dependsText += "'connector' = 'jdbc',\n"
-				dependsText += "'url' = 'jdbc:" + "postgresql" + "://" + m.Host + ":" + fmt.Sprintf("%d", m.Port) + "/" + m.Database + "',\n"
-				dependsText += "'table-name' = '" + tableName + "',\n"
-				dependsText += "'username' = '" + m.User + "',\n"
-				dependsText += "'password' = '" + m.Password + "'\n"
-				for _, opt := range m.ConnectorOptions {
-					dependsText += "," + opt + "\n"
-				}
-				for _, opt := range t.ConnectorOptions {
-					dependsText += "," + opt + "\n"
-				}
-			} else if sourceType == constants.SourceTypeClickHouse {
-				var m constants.SourceClickHouseParams
-				var t constants.FlinkTableDefineClickHouse
-
-				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
-					return
-				}
-				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
-					return
-				}
-				dependsText += "("
-				first := true
-				for _, column := range t.SqlColumn {
-					if first == true {
-						dependsText += column
-						first = false
-					} else {
-						dependsText += "," + column
-					}
-				}
-				dependsText += ") WITH (\n"
-				dependsText += "'connector' = 'clickhouse',\n"
-				dependsText += "'url' = 'clickhouse://" + m.Host + ":" + fmt.Sprintf("%d", m.Port) + "',\n"
-				dependsText += "'table-name' = '" + tableName + "',\n"
-				dependsText += "'username' = '" + m.User + "',\n"
-				dependsText += "'database-name' = '" + m.Database + "',\n"
-				dependsText += "'password' = '" + m.Password + "'\n"
-				for _, opt := range m.ConnectorOptions {
-					dependsText += "," + opt + "\n"
-				}
-				for _, opt := range t.ConnectorOptions {
-					dependsText += "," + opt + "\n"
-				}
-			} else if sourceType == constants.SourceTypeKafka {
-				var m constants.SourceKafkaParams
-				var t constants.FlinkTableDefineKafka
-
-				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
-					return
-				}
-				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
-					return
-				}
-				dependsText += "("
-				first := true
-				for _, column := range t.SqlColumn {
-					if first == true {
-						dependsText += column
-						first = false
-					} else {
-						dependsText += "," + column
-					}
-				}
-				dependsText += ") WITH (\n"
-
-				dependsText += "'connector' = 'kafka',\n"
-				dependsText += "'topic' = '" + t.Topic + "',\n"
-				dependsText += "'properties.bootstrap.servers' = '" + m.Host + ":" + fmt.Sprintf("%d", m.Port) + "',\n"
-				dependsText += "'format' = '" + t.Format + "'\n"
-				for _, opt := range m.ConnectorOptions {
-					dependsText += "," + opt + "\n"
-				}
-				for _, opt := range t.ConnectorOptions {
-					dependsText += "," + opt + "\n"
-				}
-			} else if sourceType == constants.SourceTypeS3 {
-				var m constants.SourceS3Params
-				var t constants.FlinkTableDefineS3
-
-				if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
-					return
-				}
-				if err = json.Unmarshal([]byte(tableUrl), &t); err != nil {
-					return
-				}
-				dependsText += "("
-				first := true
-				for _, column := range t.SqlColumn {
-					if first == true {
-						dependsText += column
-						first = false
-					} else {
-						dependsText += "," + column
-					}
-				}
-				dependsText += ") WITH (\n"
-
-				dependsText += "'connector' = 'filesystem',\n"
-				dependsText += "'path' = '" + t.Path + "',\n"
-				dependsText += "'format' = '" + t.Format + "'\n"
-				for _, opt := range t.ConnectorOptions {
-					dependsText += "," + opt + "\n"
-				}
-			} else {
-				err = fmt.Errorf("don't support this source mananger %s", sourceType)
-				return
-			}
-
-			dependsText += ");\n\n\n"
-		}
-	} else if nodeType == constants.NodeTypeFlinkJob {
-		dependsText += "ls" //empty is not allow.
 	}
 
 	// main run
-	mainRunText += title
+	jobInfo.ZeppelinMainRun += title
 	if nodeType == constants.NodeTypeFlinkSSQL {
-		mainRunText += ssql.MainRun
+		jobInfo.ZeppelinMainRun += ssql.MainRun
 		for table, tableName := range tablesName {
-			mainRunText = strings.Replace(mainRunText, constants.MainRunQuote+table+constants.MainRunQuote, tableName, -1)
+			jobInfo.ZeppelinMainRun = strings.Replace(jobInfo.ZeppelinMainRun, Quote+table+Quote, tableName, -1)
 		}
-		mainRunText += "\n"
+		jobInfo.ZeppelinMainRun += "\n"
 	} else if nodeType == constants.NodeTypeFlinkJob {
 		var (
 			entry          string
@@ -290,99 +326,8 @@ func GenerateFlinkJob(client SourceClient, flinkHome string, flinkAddr string, n
 			jarParallelism = ""
 		}
 		//TODO download
-		mainRunText += flinkHome + "/bin/flink run -sae -m " + flinkAddr + jarParallelism + entry + job.MainRun + " " + job.JarArgs
-		resources.Jar = job.MainRun
-	}
-
-	return
-}
-
-func GetS3Info(client SourceClient, depends string) (s3info constants.SourceS3Params, err error) {
-	var ssql constants.FlinkSSQL
-
-	if err = json.Unmarshal([]byte(depends), &ssql); err != nil {
-		return
-	}
-
-	for _, table := range ssql.Tables {
-		sourceID, _, _, errTmp := client.DescribeSourceTable(table)
-		if errTmp != nil {
-			err = errTmp
-			return
-		}
-		sourceType, ManagerUrl, errTmp := client.DescribeSourceManager(sourceID)
-		if errTmp != nil {
-			err = errTmp
-			return
-		}
-
-		if sourceType == constants.SourceTypeS3 {
-			var m constants.SourceS3Params
-
-			if err = json.Unmarshal([]byte(ManagerUrl), &m); err != nil {
-				return
-			}
-			if s3info.AccessKey == "" {
-				s3info.AccessKey = m.AccessKey
-				s3info.SecretKey = m.SecretKey
-				s3info.EndPoint = m.EndPoint
-			} else if s3info.AccessKey != m.AccessKey || s3info.SecretKey != m.SecretKey || s3info.EndPoint != m.EndPoint {
-				err = fmt.Errorf("only allow one s3 sourcemanger in a job, all accesskey secretkey endpoint is same")
-				return
-			}
-		}
-	}
-	return
-}
-
-func GenerateFlinkExecuteJars(jars string, client SourceClient, depends string) (executeJars string, err error) {
-	sourceTypes, err := GetSourceTypes(client, depends)
-
-	for _, jar := range strings.Split(strings.Replace(jars, " ", "", -1), ";") {
-		sourceType := strings.Split(jar, ":")[0]
-		executeJar := strings.Split(jar, ":")[1]
-
-		for _, jobSourceType := range sourceTypes {
-			if sourceType == jobSourceType {
-				if len(executeJars) > 0 {
-					executeJars += ","
-				}
-				executeJars += executeJar
-			}
-		}
-	}
-	return
-}
-
-func GetSourceTypes(client SourceClient, depends string) (sourcetypes []string, err error) {
-	var ssql constants.FlinkSSQL
-
-	if err = json.Unmarshal([]byte(depends), &ssql); err != nil {
-		return
-	}
-
-	for _, table := range ssql.Tables {
-		sourceID, _, _, errTmp := client.DescribeSourceTable(table)
-		if errTmp != nil {
-			err = errTmp
-			return
-		}
-		sourceType, _, errTmp := client.DescribeSourceManager(sourceID)
-		if errTmp != nil {
-			err = errTmp
-			return
-		}
-
-		find := false
-		for _, save := range sourcetypes {
-			if save == sourceType {
-				find = true
-				break
-			}
-		}
-		if find == false {
-			sourcetypes = append(sourcetypes, sourceType)
-		}
+		jobInfo.ZeppelinMainRun += flinkHome + "/bin/flink run -sae -m " + FlinkHostQuote + ":" + FlinkPortQuote + jarParallelism + entry + job.MainRun + " " + job.JarArgs
+		jobInfo.resources.Jar = job.MainRun
 	}
 	return
 }
