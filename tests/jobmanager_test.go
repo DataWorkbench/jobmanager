@@ -33,6 +33,8 @@ var mc jobpb.RunJobRequest             //manual test
 var s3 jobpb.RunJobRequest             //manual test
 var jar jobpb.RunJobRequest            //manual test
 var ck jobpb.RunJobRequest             //manual test
+var udfScala jobpb.RunJobRequest       //manual test
+var udfJar jobpb.RunJobRequest         //manual test
 
 func CreateRandomString(len int) string {
 	var container string
@@ -74,6 +76,9 @@ func mainInit(t *testing.T, manualInit bool) {
 		db.Exec("insert into mc values(7, 'USD')")
 		db.Exec("insert into mw values(2, 'EUR')")
 		db.Exec("insert into mw values(7, 'USD')")
+		db.Exec("CREATE TABLE IF NOT EXISTS udfs(a varchar(10))")
+		db.Exec("CREATE TABLE IF NOT EXISTS udfd(a varchar(10))")
+		db.Exec("insert into udfs values('abcdef')")
 	}
 	spaceID45 = "wks-0123456789012345"
 
@@ -88,6 +93,8 @@ func mainInit(t *testing.T, manualInit bool) {
 	jar = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkJob, Depends: typeToJsonString(constants.FlinkJob{Parallelism: 2, JobCpu: 2, JobMem: 2, TaskCpu: 0.2, TaskMem: 2, TaskNum: 2, JarArgs: "", JarEntry: "org.apache.flink.streaming.examples.wordcount.WordCount", MainRun: "/home/lzzhang/bigdata/flink-bin-download/flink-job-artifacts/WordCount.jar"})}
 	s3 = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012359", "sot-0123456789012360"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012360$qc$ select * from $qc$sot-0123456789012359$qc$"})}
 	ck = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012361"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012361$qc$ values(6, 6)"})}
+	udfScala = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012362", "sot-0123456789012363"}, Funcs: []string{"udf-0123456789012345"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012363$qc$ select $qc$udf-0123456789012345$qc$(a) from $qc$sot-0123456789012362$qc$"})}
+	udfJar = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012362", "sot-0123456789012363"}, Funcs: []string{"udf-0123456789012351"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012363$qc$ select $qc$udf-0123456789012351$qc$(a) from $qc$sot-0123456789012362$qc$"})}
 
 	address := "127.0.0.1:51001"
 	lp := glog.NewDefault()
@@ -111,14 +118,14 @@ func mainInit(t *testing.T, manualInit bool) {
 	ctx = grpcwrap.ContextWithRequest(context.Background(), ln, reqId)
 }
 
-func TestJobManagerGRPC_RunJob(t *testing.T) {
+func Test_RunJob(t *testing.T) {
 	mainInit(t, false)
 
 	_, err := client.RunJob(ctx, &mspd)
 	require.Nil(t, err, "%+v", err)
 }
 
-func TestJobManagerGRPC_GetJobStatus(t *testing.T) {
+func Test_GetJobStatus(t *testing.T) {
 	for {
 		var req jobpb.GetJobStatusRequest
 		req.ID = mspd.ID
@@ -135,7 +142,7 @@ func TestJobManagerGRPC_GetJobStatus(t *testing.T) {
 	}
 }
 
-func TestJobManagerGRPC_CancelJob(t *testing.T) {
+func Test_CancelJob(t *testing.T) {
 	var req jobpb.CancelJobRequest
 	var err error
 
@@ -148,7 +155,7 @@ func TestJobManagerGRPC_CancelJob(t *testing.T) {
 	require.Nil(t, err, "%+v", err)
 }
 
-func TestJobManagerGRPC_CancelAllJob(t *testing.T) {
+func Test_CancelAllJob(t *testing.T) {
 	var req jobpb.CancelAllJobRequest
 	var err error
 
@@ -163,7 +170,7 @@ func TestJobManagerGRPC_CancelAllJob(t *testing.T) {
 	require.Nil(t, err, "%+v", err)
 }
 
-func TestJobManagerGRPC_RunJobManual(t *testing.T) {
+func Test_RunJobManual(t *testing.T) {
 	//mainInit(t, true)
 	//var err error
 
@@ -183,5 +190,11 @@ func TestJobManagerGRPC_RunJobManual(t *testing.T) {
 	//require.Nil(t, err, "%+v", err)
 
 	//_, err = client.RunJob(ctx, &jar)
+	//require.Nil(t, err, "%+v", err)
+
+	//_, err = client.RunJob(ctx, &udfScala)
+	//require.Nil(t, err, "%+v", err)
+
+	//_, err = client.RunJob(ctx, &udfJar)
 	//require.Nil(t, err, "%+v", err)
 }

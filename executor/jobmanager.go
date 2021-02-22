@@ -28,6 +28,7 @@ const (
 	Quote               = constants.MainRunQuote
 	FlinkHostQuote      = Quote + "FLINK_HOST" + Quote
 	FlinkPortQuote      = Quote + "FLINK_PORT" + Quote
+	FlinkUDFNAMEQuote   = Quote + "UDF_NAME" + Quote
 
 	JobmanagerTableName = "jobmanager"
 	MaxStatusFailedNum  = 100
@@ -38,17 +39,19 @@ type JobResources struct {
 }
 
 type ParagraphsInfo struct {
-	Conf    string `json:"conf"`
-	Depends string `json:"depends"`
-	MainRun string `json:"mainrun"`
+	Conf      string `json:"conf"`
+	Depends   string `json:"depends"`
+	FuncScala string `json:"funcscala"` //jar in flink.conf
+	MainRun   string `json:"mainrun"`
 }
 
 type JobParserInfo struct {
-	ZeppelinConf    string
-	ZeppelinDepends string
-	ZeppelinMainRun string
-	S3info          constants.SourceS3Params
-	resources       JobResources
+	ZeppelinConf      string
+	ZeppelinDepends   string
+	ZeppelinFuncScala string
+	ZeppelinMainRun   string
+	S3info            constants.SourceS3Params
+	resources         JobResources
 }
 
 type JobmanagerInfo struct {
@@ -87,17 +90,19 @@ type JobmanagerExecutor struct {
 	idGenerator  *idgenerator.IDGenerator
 	httpClient   HttpClient
 	sourceClient SourceClient
+	udfClient    UdfClient
 	watchChan    chan JobWatchInfo
 	ctx          context.Context
 	logger       *glog.Logger
 }
 
-func NewJobManagerExecutor(db *gorm.DB, client HttpClient, sClient SourceClient, jobwork int32, ictx context.Context, logger *glog.Logger) *JobmanagerExecutor {
+func NewJobManagerExecutor(db *gorm.DB, client HttpClient, sClient SourceClient, uClient UdfClient, jobwork int32, ictx context.Context, logger *glog.Logger) *JobmanagerExecutor {
 	ex := &JobmanagerExecutor{
 		db:           db,
 		idGenerator:  idgenerator.New(constants.JobIDPrefix),
 		httpClient:   client,
 		sourceClient: sClient,
+		udfClient:    uClient,
 		watchChan:    make(chan JobWatchInfo, jobwork),
 		ctx:          ictx,
 		logger:       logger,
@@ -180,6 +185,13 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 		}
 	}
 
+	//FuncScala
+	if watchInfo.ParagraphIDs.FuncScala != "" {
+		if err = ex.httpClient.RunParagraphSync(watchInfo.NoteID, watchInfo.ParagraphIDs.FuncScala); err != nil {
+			return
+		}
+	}
+
 	// main fun
 	if err = ex.httpClient.RunParagraphAsync(watchInfo.NoteID, watchInfo.ParagraphIDs.MainRun); err != nil {
 		return
@@ -212,7 +224,7 @@ func (ex *JobmanagerExecutor) RunJobUtile(ctx context.Context, ID string, Worksp
 		}
 	}()
 
-	if err, jobInfo = JobParserFlink(ex.sourceClient, Depends, ex.httpClient.ZeppelinFlinkHome, ex.httpClient.ZeppelinFlinkExecuteJars, NodeType); err != nil {
+	if err, jobInfo = JobParserFlink(ex.sourceClient, ex.udfClient, Depends, ex.httpClient.ZeppelinFlinkHome, ex.httpClient.ZeppelinFlinkExecuteJars, NodeType); err != nil {
 		return
 	}
 
@@ -299,22 +311,26 @@ func (ex *JobmanagerExecutor) RunJobUtile(ctx context.Context, ID string, Worksp
 	if jobInfo.ZeppelinDepends == "" {
 		Pa.Depends = ""
 	}
-	ex.logger.Debug().Any("2aaaaaaaaaaaaaaaaaaaaaa", jobInfo).Fire()
 
-	Pa.MainRun, err = ex.httpClient.CreateParagraph(info.NoteID, 2, "JobMainrun", jobInfo.ZeppelinMainRun)
+	Pa.FuncScala, err = ex.httpClient.CreateParagraph(info.NoteID, 2, "FuncScala", jobInfo.ZeppelinFuncScala)
 	if err != nil {
-		ex.logger.Debug().Any("3aaaaaaaaaaaaaaaaaaaaaa", jobInfo).Fire()
+		return
+	}
+	if jobInfo.ZeppelinFuncScala == "" {
+		Pa.FuncScala = ""
+	}
+
+	Pa.MainRun, err = ex.httpClient.CreateParagraph(info.NoteID, 3, "JobMainrun", jobInfo.ZeppelinMainRun)
+	if err != nil {
 		return
 	}
 
 	PaByte, _ := json.Marshal(Pa)
 	info.Paragraph = string(PaByte)
 	watchInfo.ParagraphIDs = Pa
-	ex.logger.Debug().Any("1aaaaaaaaaaaaaaaaaaaaaa", jobInfo).Fire()
 
 	db := ex.db.WithContext(ctx)
 	err = db.Create(info).Error
-	ex.logger.Debug().Any("4aaaaaaaaaaaaaaaaaaaaaa", jobInfo).Fire()
 	return
 }
 
@@ -332,11 +348,12 @@ func GetNextParagraphID(job jobQueueType) (r jobQueueType) {
 	order := make(map[int]string)
 	order[0] = job.Job.ParagraphIDs.Conf
 	order[1] = job.Job.ParagraphIDs.Depends
-	order[2] = job.Job.ParagraphIDs.MainRun
+	order[2] = job.Job.ParagraphIDs.FuncScala
+	order[3] = job.Job.ParagraphIDs.MainRun
 
 	r = job
 
-	if job.ParagraphIndex == 2 {
+	if job.ParagraphIndex == 3 {
 		r.RunEnd = true
 	} else {
 		r.ParagraphIndex = job.ParagraphIndex + 1

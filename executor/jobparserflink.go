@@ -9,14 +9,7 @@ import (
 	"github.com/DataWorkbench/common/constants"
 )
 
-//      ZeppelinConf    string
-//      ZeppelinDepends string
-//      ZeppelinMainRun string
-//      S3info          constants.SourceS3Params
-//      ExecuteJars     string
-//      resources       JobResources
-
-func JobParserFlink(client SourceClient, depends string, flinkHome string, flinkExecJars string, nodeType int32) (err error, jobInfo JobParserInfo) {
+func JobParserFlink(client SourceClient, uclient UdfClient, depends string, flinkHome string, flinkExecJars string, nodeType int32) (err error, jobInfo JobParserInfo) {
 	var (
 		tablesName map[string]string
 		ssql       constants.FlinkSSQL
@@ -46,6 +39,7 @@ func JobParserFlink(client SourceClient, depends string, flinkHome string, flink
 			property    string
 			sourcetypes []string
 			executeJars string
+			udfJars     string
 		)
 
 		tablesName = make(map[string]string)
@@ -282,8 +276,48 @@ func JobParserFlink(client SourceClient, depends string, flinkHome string, flink
 			}
 		}
 		jobInfo.ZeppelinConf += "flink.execution.jars " + executeJars + "\n"
+
+		//main run
+		jobInfo.ZeppelinMainRun += title
+		jobInfo.ZeppelinMainRun += ssql.MainRun
+		for table, tableName := range tablesName {
+			jobInfo.ZeppelinMainRun = strings.Replace(jobInfo.ZeppelinMainRun, Quote+table+Quote, tableName, -1)
+		}
+		jobInfo.ZeppelinMainRun += "\n"
+
+		//udf
+		for _, udfId := range ssql.Funcs {
+			udfType, udfName, define, errTmp := uclient.DescribeUdfManager(udfId)
+			if errTmp != nil {
+				err = errTmp
+				return
+			}
+			if udfType == constants.UdfTypeScala {
+				if jobInfo.ZeppelinFuncScala == "" {
+					jobInfo.ZeppelinFuncScala = "%flink\n\n"
+				}
+				jobInfo.ZeppelinFuncScala += strings.Replace(define, FlinkUDFNAMEQuote, `\"`+udfName+`\"`, -1) + "\n\n\n"
+			} else if udfType == constants.UdfTypeJar {
+				if udfJars != "" {
+					udfJars += ","
+				}
+				udfJars += strings.Replace(define, " ", "", -1)
+				//TODO download and other
+			} else {
+				err = fmt.Errorf("don't support the udf type %s", udfType)
+				return
+			}
+			jobInfo.ZeppelinMainRun = strings.ReplaceAll(jobInfo.ZeppelinMainRun, Quote+udfId+Quote, udfName)
+		}
+		if udfJars != "" {
+			jobInfo.ZeppelinConf += "flink.udf.jars " + udfJars + "\n"
+		}
 	} else if nodeType == constants.NodeTypeFlinkJob {
-		var checkv = regexp.MustCompile(`^[a-zA-Z0-9_/. ]*$`).MatchString
+		var (
+			entry          string
+			jarParallelism string
+			checkv         = regexp.MustCompile(`^[a-zA-Z0-9_/. ]*$`).MatchString
+		)
 
 		if err = json.Unmarshal([]byte(depends), &job); err != nil {
 			return
@@ -298,21 +332,7 @@ func JobParserFlink(client SourceClient, depends string, flinkHome string, flink
 			return
 		}
 		title = "%sh\n\n"
-	}
-
-	// main run
-	jobInfo.ZeppelinMainRun += title
-	if nodeType == constants.NodeTypeFlinkSSQL {
-		jobInfo.ZeppelinMainRun += ssql.MainRun
-		for table, tableName := range tablesName {
-			jobInfo.ZeppelinMainRun = strings.Replace(jobInfo.ZeppelinMainRun, Quote+table+Quote, tableName, -1)
-		}
-		jobInfo.ZeppelinMainRun += "\n"
-	} else if nodeType == constants.NodeTypeFlinkJob {
-		var (
-			entry          string
-			jarParallelism string
-		)
+		jobInfo.ZeppelinMainRun += title
 
 		if len(job.JarEntry) > 0 {
 			entry = ""

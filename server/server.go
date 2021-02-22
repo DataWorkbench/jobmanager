@@ -67,8 +67,13 @@ func Start() (err error) {
 		err = tmperr
 		return
 	}
+	udfClient, tmperr1 := executor.NewUdfClient(cfg.UdfmanagerServer)
+	if tmperr1 != nil {
+		err = tmperr1
+		return
+	}
 	rpcServer.Register(func(s *grpc.Server) {
-		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(executor.NewJobManagerExecutor(db, httpClient, sourceClient, cfg.JobWorks, ctx, lp)))
+		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(executor.NewJobManagerExecutor(db, httpClient, sourceClient, udfClient, cfg.JobWorks, ctx, lp)))
 	})
 
 	// handle signal
