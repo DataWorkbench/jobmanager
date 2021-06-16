@@ -4,6 +4,7 @@ USE data_workbench;
 
 create table jobmanager (
 	id varchar(24),
+	enginetype varchar(24),
 	spaceid varchar(24),
 	noteID varchar(9),
 	status varchar(20),
@@ -11,7 +12,8 @@ create table jobmanager (
 	paragraph varchar(2000),
 	createtime timestamp default now(),
 	updatetime timestamp,
-	resources varchar(2000)
+	resources varchar(2000),
+	zeppelinserver varchar(256)
 );
 
 alter table jobmanager add constraint jobmanager_pkey primary key(id);

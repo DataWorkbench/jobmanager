@@ -23,16 +23,13 @@ const (
 
 // Config is the configuration settings for spacemanager
 type Config struct {
-	LogLevel                 int8                   `json:"log_level"      yaml:"log_level"      env:"LOG_LEVEL" validate:"gte=1,lte=5"`
-	GRPCServer               *grpcwrap.ServerConfig `json:"grpc_server"    yaml:"grpc_server"    env:"GRPC_SERVER"         validate:"required"`
-	MetricsServer            *metrics.Config        `json:"metrics_server" yaml:"metrics_server" env:"METRICS_SERVER"      validate:"required"`
-	MySQL                    *gormwrap.MySQLConfig  `json:"mysql"          yaml:"mysql"          env:"MYSQL"               validate:"required"`
-	JobWorks                 int32                  `json:"job_works"      yaml:"job_works"      env:"JOB_WORKS" validate:"gte=1,lte=1000"`
-	ZeppelinServer           string                 `json:"zeppelin_server"      yaml:"zeppelin_server"      env:"ZEPPELIN_SERVER" validate:"required"`
-	ZeppelinFlinkHome        string                 `json:"zeppelin_flink_home"      yaml:"zeppelin_flink_home"      env:"ZEPPELIN_FLINK_HOME" validate:"required"`
-	ZeppelinFlinkExecuteJars string                 `json:"zeppelin_flink_execute_jars"      yaml:"zeppelin_flink_execute_jars"      env:"ZEPPELIN_FLINK_EXECUTE_JARS" validate:"required"`
-	SourcemanagerServer      string                 `json:"sourcemanager_server"      yaml:"sourcemanager_server"      env:"SOURCEMANAGER_SERVER" validate:"required"`
-	UdfmanagerServer         string                 `json:"udfmanager_server"      yaml:"udfmanager_server"      env:"UDFMANAGER_SERVER" validate:"required"`
+	LogLevel            int8                   `json:"log_level"      yaml:"log_level"      env:"LOG_LEVEL" validate:"gte=1,lte=5"`
+	ZeppelinScaleServer string                 `json:"zeppelin_scale_server"      yaml:"zeppelin_scale_server"      env:"ZEPPELIN_SCALE_SERVER" validate:"required"`
+	JobDeveloperServer  string                 `json:"jobdeveloper_server"      yaml:"jobdeveloper_server"      env:"JOBDEVELOPER_SERVER" validate:"required"`
+	JobWatcherServer    string                 `json:"jobwatcher_server"      yaml:"jobwatcher_server"      env:"JOBWATCHER_SERVER" validate:"required"`
+	GRPCServer          *grpcwrap.ServerConfig `json:"grpc_server"    yaml:"grpc_server"    env:"GRPC_SERVER"         validate:"required"`
+	MetricsServer       *metrics.Config        `json:"metrics_server" yaml:"metrics_server" env:"METRICS_SERVER"      validate:"required"`
+	MySQL               *gormwrap.MySQLConfig  `json:"mysql"          yaml:"mysql"          env:"MYSQL"               validate:"required"`
 }
 
 func loadFromFile(cfg *Config) (err error) {

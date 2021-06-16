@@ -20,6 +20,8 @@ import (
 
 	"github.com/DataWorkbench/jobmanager/config"
 	"github.com/DataWorkbench/jobmanager/executor"
+
+	"github.com/DataWorkbench/common/constants"
 )
 
 // Start for start the http server
@@ -61,19 +63,23 @@ func Start() (err error) {
 	if err != nil {
 		return
 	}
-	httpClient := executor.NewHttpClient(cfg.ZeppelinServer, cfg.ZeppelinFlinkHome, cfg.ZeppelinFlinkExecuteJars)
-	sourceClient, tmperr := executor.NewSourceClient(cfg.SourcemanagerServer)
+	jobdevClient, tmperr := constants.NewJobdevClient(cfg.JobDeveloperServer)
 	if tmperr != nil {
 		err = tmperr
 		return
 	}
-	udfClient, tmperr1 := executor.NewUdfClient(cfg.UdfmanagerServer)
-	if tmperr1 != nil {
-		err = tmperr1
+	jobWatcherClient, tmperr := executor.NewJobWatcherClient(cfg.JobWatcherServer)
+	if tmperr != nil {
+		err = tmperr
+		return
+	}
+	zeppelinScaleClient, tmperr := executor.NewZeppelinScaleClient(cfg.ZeppelinScaleServer)
+	if tmperr != nil {
+		err = tmperr
 		return
 	}
 	rpcServer.Register(func(s *grpc.Server) {
-		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(executor.NewJobManagerExecutor(db, httpClient, sourceClient, udfClient, cfg.JobWorks, ctx, lp)))
+		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(executor.NewJobManagerExecutor(db, jobdevClient, ctx, lp, jobWatcherClient, zeppelinScaleClient)))
 	})
 
 	// handle signal

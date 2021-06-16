@@ -11,10 +11,8 @@ import (
 )
 
 type HttpClient struct {
-	ZeppelinServer           string
-	ZeppelinFlinkHome        string
-	ZeppelinFlinkExecuteJars string
-	Client                   *http.Client
+	ZeppelinServer string
+	Client         *http.Client
 }
 
 const (
@@ -27,8 +25,8 @@ const (
 	ParagraphAbort   = "ABORT"
 )
 
-func NewHttpClient(serverAddr string, zeplHome string, flinkExecJars string) HttpClient {
-	return HttpClient{ZeppelinServer: "http://" + serverAddr, ZeppelinFlinkHome: zeplHome, ZeppelinFlinkExecuteJars: flinkExecJars, Client: &http.Client{Timeout: time.Second * 60}}
+func NewHttpClient(serverAddr string) HttpClient {
+	return HttpClient{ZeppelinServer: "http://" + serverAddr, Client: &http.Client{Timeout: time.Second * 60}}
 }
 
 func doRequest(client *http.Client, method string, status int, api string, body string, retJson bool) (repJson map[string]string, repString string, err error) {
@@ -142,7 +140,7 @@ func (ex *HttpClient) GetParagraphStatus(noteID string, paragraphID string) (sta
 	return
 }
 
-func (ex *HttpClient) GetParagraphErrorMsg(noteID string, paragraphID string) (msg string, err error) {
+func (ex *HttpClient) GetParagraphResultOutput(noteID string, paragraphID string) (msg string, err error) {
 	var repString string
 	var repJsonLevel1 map[string]json.RawMessage
 	var repJsonLevel2 map[string]json.RawMessage

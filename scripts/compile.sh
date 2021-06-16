@@ -20,6 +20,9 @@ else
     TAGS="netgo"
 fi
 
+go mod tidy
+go mod download
+
 go build --tags "${TAGS}" -ldflags "
 -X ${MODULE}.GoVersion=$(go version|awk '{print $3}')
 -X ${MODULE}.CompileBy=$(git config user.email)

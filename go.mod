@@ -15,3 +15,7 @@ require (
 	gorm.io/driver/mysql v1.0.3
 	gorm.io/gorm v1.20.8
 )
+
+replace github.com/DataWorkbench/common v0.0.0-20210219045325-3a1f4c8b88bd => /home/lzzhang/bigdata/common/
+
+replace github.com/DataWorkbench/gproto v0.0.0-20210219054746-a035271b0da3 => /home/lzzhang/bigdata/gproto/
