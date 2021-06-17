@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 
+	"github.com/DataWorkbench/common/constants"
 	"github.com/DataWorkbench/gproto/pkg/jobpb"
 	"github.com/DataWorkbench/gproto/pkg/model"
 
@@ -23,8 +24,21 @@ func NewJobManagerServer(executor *executor.JobmanagerExecutor) *JobManagerServe
 	}
 }
 
-func (s *JobManagerServer) RunJob(ctx context.Context, req *jobpb.RunJobRequest) (*jobpb.JobReply, error) {
-	rep, err := s.executor.RunJob(ctx, req.GetID(), req.GetWorkspaceID(), req.GetEngineID(), req.GetEngineType(), req.GetJobInfo())
+func (s *JobManagerServer) Run(ctx context.Context, req *jobpb.RunJobRequest) (*jobpb.JobReply, error) {
+	rep, err := s.executor.RunJob(ctx, req.GetID(), req.GetSpaceID(), req.GetEngineID(), req.GetEngineType(), constants.RunCommand, req.GetJobInfo())
+	return &rep, err
+}
+
+func (s *JobManagerServer) Syntax(ctx context.Context, req *jobpb.RunJobRequest) (*jobpb.JobReply, error) {
+	rep, err := s.executor.RunJob(ctx, req.GetID(), req.GetSpaceID(), req.GetEngineID(), req.GetEngineType(), constants.SyntaxCheckCommand, req.GetJobInfo())
+	return &rep, err
+}
+func (s *JobManagerServer) Preview(ctx context.Context, req *jobpb.RunJobRequest) (*jobpb.JobReply, error) {
+	rep, err := s.executor.RunJob(ctx, req.GetID(), req.GetSpaceID(), req.GetEngineID(), req.GetEngineType(), constants.PreviewCommand, req.GetJobInfo())
+	return &rep, err
+}
+func (s *JobManagerServer) Explain(ctx context.Context, req *jobpb.RunJobRequest) (*jobpb.JobReply, error) {
+	rep, err := s.executor.RunJob(ctx, req.GetID(), req.GetSpaceID(), req.GetEngineID(), req.GetEngineType(), constants.ExplainCommand, req.GetJobInfo())
 	return &rep, err
 }
 
@@ -33,8 +47,8 @@ func (s *JobManagerServer) CancelJob(ctx context.Context, req *jobpb.CancelJobRe
 	return s.emptyReply, err
 }
 
-func (s *JobManagerServer) GetJobStatus(ctx context.Context, req *jobpb.GetJobStatusRequest) (*jobpb.JobReply, error) {
-	rep, err := s.executor.GetJobStatus(ctx, req.GetID())
+func (s *JobManagerServer) GetJobState(ctx context.Context, req *jobpb.GetJobStateRequest) (*jobpb.JobReply, error) {
+	rep, err := s.executor.GetJobState(ctx, req.GetID())
 	return &rep, err
 }
 

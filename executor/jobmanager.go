@@ -103,7 +103,7 @@ func NewJobManagerExecutor(db *gorm.DB, job_client constants.JobdevClient, ictx 
 	return ex
 }
 
-func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID string, EngineID string, EngineType string, JobInfo string) (rep jobpb.JobReply, err error) {
+func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID string, EngineID string, EngineType string, Command string, JobInfo string) (rep jobpb.JobReply, err error) {
 	if EngineType == constants.ServerTypeFlink {
 		var (
 			job             constants.FlinkNode
@@ -125,7 +125,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 					_ = httpClient.DeleteNote(info.NoteID)
 				}
 
-				rep.Status = constants.StatusFailed
+				rep.State = constants.StatusFailed
 				rep.Message = fmt.Sprint(err)
 			}
 		}()
@@ -145,6 +145,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 		req.WorkspaceID = WorkspaceID
 		req.EngineID = EngineID
 		req.EngineType = EngineType
+		req.Command = Command
 		req.JobInfo = JobInfo
 
 		resp, err = ex.jobDevClient.Client.JobParser(ex.jobDevClient.Ctx, &req)
@@ -156,8 +157,8 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 			return
 		}
 
-		if job.Command == constants.PreviewCommand {
-			rep.Status = constants.StatusFinish
+		if Command == constants.PreviewCommand {
+			rep.State = constants.StatusFinish
 			if flinkJobElement.ZeppelinDepends != "" {
 				rep.Message += flinkJobElement.ZeppelinDepends[strings.Index(flinkJobElement.ZeppelinDepends, "\n"):]
 			}
@@ -215,7 +216,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 				return
 			}
 
-			if job.Command == constants.RunCommand {
+			if Command == constants.RunCommand {
 				var (
 					watchInfo        constants.JobWatchInfo
 					watchInfoRequest jobwpb.WatchJobRequest
@@ -255,17 +256,17 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 					return
 				}
 
-				rep.Status = constants.StatusRunning
+				rep.State = constants.StatusRunning
 				rep.Message = constants.JobRunning
 				return
-			} else if job.Command == constants.ExplainCommand {
+			} else if Command == constants.ExplainCommand {
 				var (
 					result string
 				)
 
 				if err = httpClient.RunParagraphSync(info.NoteID, Pa.Conf); err != nil {
 					_ = constants.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
-					rep.Status = constants.StatusFailed
+					rep.State = constants.StatusFailed
 					rep.Message = fmt.Sprint(err)
 					return
 				}
@@ -290,26 +291,26 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 				}
 
 				if result, err = httpClient.GetParagraphResultOutput(info.NoteID, Pa.MainRun); err != nil {
-					rep.Status = constants.StatusFailed
+					rep.State = constants.StatusFailed
 				} else {
-					rep.Status = constants.StatusFinish
+					rep.State = constants.StatusFinish
 				}
 				rep.Message = result
 
-				_ = constants.ModifyStatus(ctx, ID, rep.Status, result, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+				_ = constants.ModifyStatus(ctx, ID, rep.State, result, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 				if err = httpClient.DeleteNote(info.NoteID); err != nil {
 					ex.logger.Error().Msg("can't delete the job note").String("jobid", ID).Fire()
 				}
 
 				return
-			} else if job.Command == constants.SyntaxCheckCommand {
+			} else if Command == constants.SyntaxCheckCommand {
 				var (
 					result string
 				)
 
 				if err = httpClient.RunParagraphSync(info.NoteID, Pa.Conf); err != nil {
 					_ = constants.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
-					rep.Status = constants.StatusFailed
+					rep.State = constants.StatusFailed
 					rep.Message = fmt.Sprint(err)
 					return
 				}
@@ -329,7 +330,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 				}
 
 				if err = httpClient.RunParagraphSync(info.NoteID, Pa.MainRun); err != nil {
-					rep.Status = constants.StatusFailed
+					rep.State = constants.StatusFailed
 					if result, err = httpClient.GetParagraphResultOutput(info.NoteID, Pa.MainRun); err != nil {
 						rep.Message = "syntax check failed, can't get failed message."
 					} else {
@@ -337,11 +338,11 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 						rep.Message = result1[strings.Index(result1, ":")+1:]
 					}
 				} else {
-					rep.Status = constants.StatusFinish
+					rep.State = constants.StatusFinish
 					rep.Message = "syntax check success"
 				}
 
-				_ = constants.ModifyStatus(ctx, ID, rep.Status, rep.Message, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+				_ = constants.ModifyStatus(ctx, ID, rep.State, rep.Message, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 				if err = httpClient.DeleteNote(info.NoteID); err != nil {
 					ex.logger.Error().Msg("can't delete the job note").String("jobid", ID).Fire()
 				}
@@ -354,7 +355,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 	return
 }
 
-func (ex *JobmanagerExecutor) GetJobStatus(ctx context.Context, ID string) (rep jobpb.JobReply, err error) {
+func (ex *JobmanagerExecutor) GetJobState(ctx context.Context, ID string) (rep jobpb.JobReply, err error) {
 	job, tmperr := ex.GetJobInfo(ctx, ID)
 
 	if tmperr != nil {
@@ -362,7 +363,7 @@ func (ex *JobmanagerExecutor) GetJobStatus(ctx context.Context, ID string) (rep 
 		return
 	}
 
-	rep.Status = constants.StringStatusToInt32(job.Status)
+	rep.State = constants.StringStatusToInt32(job.Status)
 	rep.Message = job.Message
 	return
 }

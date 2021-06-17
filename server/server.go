@@ -18,10 +18,9 @@ import (
 	"github.com/DataWorkbench/common/metrics"
 	"github.com/DataWorkbench/gproto/pkg/jobpb"
 
+	"github.com/DataWorkbench/common/constants"
 	"github.com/DataWorkbench/jobmanager/config"
 	"github.com/DataWorkbench/jobmanager/executor"
-
-	"github.com/DataWorkbench/common/constants"
 )
 
 // Start for start the http server
