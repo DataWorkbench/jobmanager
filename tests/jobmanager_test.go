@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/DataWorkbench/glog"
 	"github.com/stretchr/testify/require"
@@ -23,17 +24,19 @@ import (
 )
 
 var mspd jobpb.RunJobRequest           //regress test
+var mw_1 jobpb.RunJobRequest           //manual test
 var mspdcancel jobpb.RunJobRequest     //regress test
 var mspdcancelall1 jobpb.RunJobRequest //regress test
 var mspdcancelall2 jobpb.RunJobRequest //regress test
-var mspdpg jobpb.RunJobRequest         //manual test
-var mw jobpb.RunJobRequest             //manual test
-var mc jobpb.RunJobRequest             //manual test
-var s3 jobpb.RunJobRequest             //manual test
-var jar jobpb.RunJobRequest            //manual test
-var ck jobpb.RunJobRequest             //manual test
-var udfScala jobpb.RunJobRequest       //manual test
-var udfJar jobpb.RunJobRequest         //manual test
+
+var mspdpg jobpb.RunJobRequest   //manual test
+var mw jobpb.RunJobRequest       //manual test
+var mc jobpb.RunJobRequest       //manual test
+var s3 jobpb.RunJobRequest       //manual test
+var jar jobpb.RunJobRequest      //manual test
+var ck jobpb.RunJobRequest       //manual test
+var udfScala jobpb.RunJobRequest //manual test
+var udfJar jobpb.RunJobRequest   //manual test
 
 func CreateRandomString(len int) string {
 	var container string
@@ -59,7 +62,7 @@ var spaceID45 string
 
 func mainInit(t *testing.T, manualInit bool) {
 	// create table in mysql
-	dsn := "root:123456@tcp(127.0.0.1:3306)/data_workbench"
+	dsn := "root:password@tcp(127.0.0.1:3306)/data_workbench"
 	db, cerr := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	require.Nil(t, cerr, "%+v", cerr)
 	db.Exec("CREATE TABLE IF NOT EXISTS ms(id bigint, id1 bigint)")
@@ -84,6 +87,11 @@ func mainInit(t *testing.T, manualInit bool) {
 	spaceID45 = "wks-0123456789012345"
 
 	mspd = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.ServerTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012347","table":"ms","distinct":"ALL","column":[{"field":"id","as":"id"},{"field":"id1","as":""}]}},{"nodetype":"Dest","nodeid":"xx1","upstream":"xx0","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"pd","column":["id","id1"],"id":"sot-0123456789012348"}}]}`}
+	mw_1 = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.ServerTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012346","table":"billing as k","distinct":"ALL","column":[{"field":"k.paycount * r.rate","as":"stotal"}]}},{"nodetype":"Source","nodeid":"rxx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012355","table":"mw FOR SYSTEM_TIME AS OF k.tproctime AS r","distinct":"ALL","column":null}},{"nodetype":"Join","nodeid":"xx1","upstream":"xx0","upstreamright":"rxx0","downstream":"xx2","pointx":"","pointy":"","property":{"join":"JOIN","expression":"r.dbmoney = k.paymoney","column":[{"field":"stotal","as":""}]}},{"nodetype":"Dest","nodeid":"xx2","upstream":"xx1","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"mwd","column":["total"],"id":"sot-0123456789012356"}}]}`}
+	mspdcancel = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.ServerTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012347","table":"ms","distinct":"ALL","column":[{"field":"id","as":"id"},{"field":"id1","as":""}]}},{"nodetype":"Dest","nodeid":"xx1","upstream":"xx0","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"pd","column":["id","id1"],"id":"sot-0123456789012348"}}]}`}
+	mspdcancelall1 = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.ServerTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012347","table":"ms","distinct":"ALL","column":[{"field":"id","as":"id"},{"field":"id1","as":""}]}},{"nodetype":"Dest","nodeid":"xx1","upstream":"xx0","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"pd","column":["id","id1"],"id":"sot-0123456789012348"}}]}`}
+	mspdcancelall2 = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.ServerTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012347","table":"ms","distinct":"ALL","column":[{"field":"id","as":"id"},{"field":"id1","as":""}]}},{"nodetype":"Dest","nodeid":"xx1","upstream":"xx0","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"pd","column":["id","id1"],"id":"sot-0123456789012348"}}]}`}
+
 	//mspdcancel = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012348"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012348$qc$ select * from $qc$sot-0123456789012347$qc$"})}
 	//mspdcancelall1 = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012348"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012348$qc$ select * from $qc$sot-0123456789012347$qc$"})}
 	//mspdcancelall2 = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012348"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012348$qc$ select * from $qc$sot-0123456789012347$qc$"})}
@@ -97,7 +105,7 @@ func mainInit(t *testing.T, manualInit bool) {
 	//udfScala = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012362", "sot-0123456789012363"}, Funcs: []string{"udf-0123456789012345"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012363$qc$ select $qc$udf-0123456789012345$qc$(a) from $qc$sot-0123456789012362$qc$"})}
 	//udfJar = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012362", "sot-0123456789012363"}, Funcs: []string{"udf-0123456789012351"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012363$qc$ select $qc$udf-0123456789012351$qc$(a) from $qc$sot-0123456789012362$qc$"})}
 
-	address := "127.0.0.1:54001"
+	address := "127.0.0.1:9105"
 	lp := glog.NewDefault()
 	ctx = glog.WithContext(context.Background(), lp)
 
@@ -145,77 +153,80 @@ func Test_Explain(t *testing.T) {
 	require.Nil(t, err, "%+v", err)
 }
 
-//func Test_GetJobStatus(t *testing.T) {
-//	mainInit(t, false)
-//	for {
-//		var req jobpb.GetJobStateRequest
-//		req.ID = mspd.ID
-//
-//		rep, err := client.GetJobState(ctx, &req)
-//		require.Nil(t, err, "%+v", err)
-//		if rep.State == constants.InstanceStateRunning {
-//			time.Sleep(time.Second)
-//		} else if rep.State == constants.InstanceStateFailed {
-//			require.Equal(t, "success", "failed")
-//		} else if rep.State == constants.InstanceStateSucceed {
-//			break
-//		}
-//	}
-//}
-//
-//func Test_CancelJob(t *testing.T) {
-//	var req jobpb.CancelJobRequest
-//	var err error
-//
-//	_, err = client.Run(ctx, &mspdcancel)
-//	require.Nil(t, err, "%+v", err)
-//
-//	req.ID = mspdcancel.ID
-//
-//	_, err = client.CancelJob(ctx, &req)
-//	require.Nil(t, err, "%+v", err)
-//}
-//
-//func Test_CancelAllJob(t *testing.T) {
-//	var req jobpb.CancelAllJobRequest
-//	var err error
-//
-//	req.SpaceID = spaceID45
-//	time.Sleep(time.Second * 10)
-//
-//	go client.Run(ctx, &mspdcancelall1)
-//	go client.Run(ctx, &mspdcancelall2)
-//
-//	time.Sleep(time.Second * 10)
-//	_, err = client.CancelAllJob(ctx, &req)
-//	require.Nil(t, err, "%+v", err)
-//}
-//
-//func Test_RunJobManual(t *testing.T) {
-//	//mainInit(t, true)
-//	//var err error
-//
-//	//_, err = client.RunJob(ctx, &ck)
-//	//require.Nil(t, err, "%+v", err)
-//
-//	//_, err = client.RunJob(ctx, &s3)
-//	//require.Nil(t, err, "%+v", err)
-//
-//	//_, err = client.RunJob(ctx, &mspdpg)
-//	//require.Nil(t, err, "%+v", err)
-//
-//	//_, err = client.RunJob(ctx, &mc)
-//	//require.Nil(t, err, "%+v", err)
-//
-//	//_, err = client.RunJob(ctx, &mw)
-//	//require.Nil(t, err, "%+v", err)
-//
-//	//_, err = client.RunJob(ctx, &jar)
-//	//require.Nil(t, err, "%+v", err)
-//
-//	//_, err = client.RunJob(ctx, &udfScala)
-//	//require.Nil(t, err, "%+v", err)
-//
-//	//_, err = client.RunJob(ctx, &udfJar)
-//	//require.Nil(t, err, "%+v", err)
-//}
+func Test_GetJobStatus(t *testing.T) {
+	mainInit(t, false)
+	for {
+		var req jobpb.GetJobStateRequest
+		req.ID = mspd.ID
+
+		rep, err := client.GetJobState(ctx, &req)
+		require.Nil(t, err, "%+v", err)
+		if rep.State == constants.InstanceStateRunning {
+			time.Sleep(time.Second)
+		} else if rep.State == constants.InstanceStateFailed {
+			require.Equal(t, "success", "failed")
+		} else if rep.State == constants.InstanceStateSucceed {
+			break
+		}
+	}
+}
+
+func Test_CancelJob(t *testing.T) {
+	var req jobpb.CancelJobRequest
+	var err error
+
+	_, err = client.Run(ctx, &mspdcancel)
+	require.Nil(t, err, "%+v", err)
+
+	req.ID = mspdcancel.ID
+
+	_, err = client.CancelJob(ctx, &req)
+	require.Nil(t, err, "%+v", err)
+}
+
+func Test_CancelAllJob(t *testing.T) {
+	var req jobpb.CancelAllJobRequest
+	var err error
+
+	req.SpaceID = spaceID45
+	time.Sleep(time.Second * 10)
+
+	go client.Run(ctx, &mspdcancelall1)
+	go client.Run(ctx, &mspdcancelall2)
+
+	time.Sleep(time.Second * 10)
+	_, err = client.CancelAllJob(ctx, &req)
+	require.Nil(t, err, "%+v", err)
+}
+
+func Test_RunJobManual(t *testing.T) {
+	//mainInit(t, true)
+	//var err error
+
+	//_, err = client.Run(ctx, &mw_1)
+	//require.Nil(t, err, "%+v", err)
+
+	//_, err = client.RunJob(ctx, &ck)
+	//require.Nil(t, err, "%+v", err)
+
+	//_, err = client.RunJob(ctx, &s3)
+	//require.Nil(t, err, "%+v", err)
+
+	//_, err = client.RunJob(ctx, &mspdpg)
+	//require.Nil(t, err, "%+v", err)
+
+	//_, err = client.RunJob(ctx, &mc)
+	//require.Nil(t, err, "%+v", err)
+
+	//_, err = client.RunJob(ctx, &mw)
+	//require.Nil(t, err, "%+v", err)
+
+	//_, err = client.RunJob(ctx, &jar)
+	//require.Nil(t, err, "%+v", err)
+
+	//_, err = client.RunJob(ctx, &udfScala)
+	//require.Nil(t, err, "%+v", err)
+
+	//_, err = client.RunJob(ctx, &udfJar)
+	//require.Nil(t, err, "%+v", err)
+}
