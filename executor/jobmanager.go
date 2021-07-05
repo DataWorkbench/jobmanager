@@ -113,6 +113,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 			info            constants.JobmanagerInfo
 			Pa              constants.FlinkParagraphsInfo
 			httpClient      constants.HttpClient
+			createRecord    bool
 			empty           model.EmptyStruct
 		)
 
@@ -127,6 +128,13 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 
 				rep.State = constants.StatusFailed
 				rep.Message = fmt.Sprint(err)
+
+				if createRecord == true {
+					//time.Sleep(time.Second * 2) why gorm can't find the new row
+					//TODO lzzhang. here can't find the record in mysql.
+					_ = constants.ModifyStatus(ctx, ID, rep.State, rep.Message, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+				}
+
 			}
 		}()
 
@@ -215,6 +223,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 			if err != nil {
 				return
 			}
+			createRecord = true
 
 			if Command == constants.RunCommand {
 				var (
