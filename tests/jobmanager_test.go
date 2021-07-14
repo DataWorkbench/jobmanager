@@ -71,6 +71,7 @@ func mainInit(t *testing.T, manualInit bool) {
 	db.Exec("delete from pd")
 	db.Exec("insert into ms values(1, 1)")
 	db.Exec("insert into ms values(2, 2)")
+	db.Exec("insert into workspace values('wks-0123456789012345', 'usr-abcd1234', 'lzz', 'lzz', 1, now(), now());")
 	if manualInit == true {
 		db.Exec("CREATE TABLE IF NOT EXISTS mc(rate bigint, dbmoney varchar(10))")
 		db.Exec("CREATE TABLE IF NOT EXISTS mcd(total bigint)")
