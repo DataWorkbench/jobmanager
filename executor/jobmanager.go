@@ -31,9 +31,7 @@ func NewJobWatcherClient(serverAddr string) (c JobWatcherClient, err error) {
 
 	ctx := glog.WithContext(context.Background(), glog.NewDefault())
 	conn, err = grpcwrap.NewConn(ctx, &grpcwrap.ClientConfig{
-		Address:      serverAddr,
-		LogLevel:     2,
-		LogVerbosity: 99,
+		Address: serverAddr,
 	})
 	if err != nil {
 		return
@@ -60,9 +58,7 @@ func NewZeppelinScaleClient(serverAddr string) (c ZeppelinScaleClient, err error
 
 	ctx := glog.WithContext(context.Background(), glog.NewDefault())
 	conn, err = grpcwrap.NewConn(ctx, &grpcwrap.ClientConfig{
-		Address:      serverAddr,
-		LogLevel:     2,
-		LogVerbosity: 99,
+		Address: serverAddr,
 	})
 	if err != nil {
 		return
