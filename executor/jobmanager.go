@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/DataWorkbench/common/constants"
+	"github.com/DataWorkbench/common/functions"
 	"github.com/DataWorkbench/common/grpcwrap"
 	"github.com/DataWorkbench/common/utils/idgenerator"
 	"github.com/DataWorkbench/glog"
@@ -16,76 +17,39 @@ import (
 	"github.com/DataWorkbench/gproto/pkg/jobwpb"
 	"github.com/DataWorkbench/gproto/pkg/model"
 	"github.com/DataWorkbench/gproto/pkg/zepspb"
-	"google.golang.org/grpc"
 
 	"gorm.io/gorm"
 )
 
 type JobWatcherClient struct {
 	client jobwpb.JobwatcherClient
-	ctx    context.Context
 }
 
-func NewJobWatcherClient(serverAddr string) (c JobWatcherClient, err error) {
-	var conn *grpc.ClientConn
-
-	ctx := glog.WithContext(context.Background(), glog.NewDefault())
-	conn, err = grpcwrap.NewConn(ctx, &grpcwrap.ClientConfig{
-		Address: serverAddr,
-	})
-	if err != nil {
-		return
-	}
-
+func NewJobWatcherClient(conn *grpcwrap.ClientConn) (c JobWatcherClient, err error) {
 	c.client = jobwpb.NewJobwatcherClient(conn)
-
-	ln := glog.NewDefault().Clone()
-	reqId, _ := idgenerator.New("").Take()
-	ln.WithFields().AddString("rid", reqId)
-
-	c.ctx = grpcwrap.ContextWithRequest(context.Background(), ln, reqId)
-
 	return c, nil
 }
 
 type ZeppelinScaleClient struct {
 	client zepspb.ZeppelinScaleClient
-	ctx    context.Context
 }
 
-func NewZeppelinScaleClient(serverAddr string) (c ZeppelinScaleClient, err error) {
-	var conn *grpc.ClientConn
-
-	ctx := glog.WithContext(context.Background(), glog.NewDefault())
-	conn, err = grpcwrap.NewConn(ctx, &grpcwrap.ClientConfig{
-		Address: serverAddr,
-	})
-	if err != nil {
-		return
-	}
-
+func NewZeppelinScaleClient(conn *grpcwrap.ClientConn) (c ZeppelinScaleClient, err error) {
 	c.client = zepspb.NewZeppelinScaleClient(conn)
-
-	ln := glog.NewDefault().Clone()
-	reqId, _ := idgenerator.New("").Take()
-	ln.WithFields().AddString("rid", reqId)
-
-	c.ctx = grpcwrap.ContextWithRequest(context.Background(), ln, reqId)
-
 	return c, nil
 }
 
 type JobmanagerExecutor struct {
 	db                  *gorm.DB
 	idGenerator         *idgenerator.IDGenerator
-	jobDevClient        constants.JobdevClient
+	jobDevClient        functions.JobdevClient
 	jobWatcherClient    JobWatcherClient
 	zeppelinScaleClient ZeppelinScaleClient
 	ctx                 context.Context
 	logger              *glog.Logger
 }
 
-func NewJobManagerExecutor(db *gorm.DB, job_client constants.JobdevClient, ictx context.Context, logger *glog.Logger, watcher_client JobWatcherClient, zeppelinscale_client ZeppelinScaleClient) *JobmanagerExecutor {
+func NewJobManagerExecutor(db *gorm.DB, job_client functions.JobdevClient, ictx context.Context, logger *glog.Logger, watcher_client JobWatcherClient, zeppelinscale_client ZeppelinScaleClient) *JobmanagerExecutor {
 	ex := &JobmanagerExecutor{
 		db:                  db,
 		idGenerator:         idgenerator.New(constants.JobIDPrefix),
@@ -106,16 +70,16 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 			req             jobdevpb.JobParserRequest
 			resp            *jobdevpb.JobElement
 			flinkJobElement constants.JobElementFlink
-			info            constants.JobmanagerInfo
+			info            functions.JobmanagerInfo
 			Pa              constants.FlinkParagraphsInfo
-			httpClient      constants.HttpClient
+			httpClient      functions.HttpClient
 			createRecord    bool
 			empty           model.EmptyStruct
 		)
 
 		defer func() {
 			if err != nil {
-				if tmp_err := constants.FreeJobResources(flinkJobElement.Resources, EngineType, ex.logger, httpClient, ex.jobDevClient); tmp_err != nil {
+				if tmp_err := functions.FreeJobResources(ctx, flinkJobElement.Resources, EngineType, ex.logger, httpClient, ex.jobDevClient); tmp_err != nil {
 					ex.logger.Warn().String("can't delete jar", flinkJobElement.Resources.Jar).String("can't FreeEngine", flinkJobElement.Resources.JobID).Fire()
 				}
 				if info.NoteID != "" {
@@ -128,18 +92,18 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 				if createRecord == true {
 					//time.Sleep(time.Second * 2) why gorm can't find the new row
 					//TODO lzzhang. here can't find the record in mysql.
-					_ = constants.ModifyStatus(ctx, ID, rep.State, rep.Message, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+					_ = functions.ModifyStatus(ctx, ID, rep.State, rep.Message, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 				}
 
 			}
 		}()
 
-		zeppelinServer, tmperr := ex.zeppelinScaleClient.client.GetZeppelinAddress(ex.zeppelinScaleClient.ctx, &empty)
+		zeppelinServer, tmperr := ex.zeppelinScaleClient.client.GetZeppelinAddress(ctx, &empty)
 		if tmperr != nil {
 			err = tmperr
 			return
 		}
-		httpClient = constants.NewHttpClient(zeppelinServer.ServerAddress)
+		httpClient = functions.NewHttpClient(zeppelinServer.ServerAddress)
 
 		if err = json.Unmarshal([]byte(JobInfo), &job); err != nil {
 			return
@@ -152,7 +116,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 		req.Command = Command
 		req.JobInfo = JobInfo
 
-		resp, err = ex.jobDevClient.Client.JobParser(ex.jobDevClient.Ctx, &req)
+		resp, err = ex.jobDevClient.Client.JobParser(ctx, &req)
 		if err != nil {
 			return
 		}
@@ -223,7 +187,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 
 			if Command == constants.RunCommand {
 				var (
-					watchInfo        constants.JobWatchInfo
+					watchInfo        functions.JobWatchInfo
 					watchInfoRequest jobwpb.WatchJobRequest
 				)
 
@@ -256,7 +220,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 
 				watchInfoByte, _ := json.Marshal(watchInfo)
 				watchInfoRequest.JobInfo = string(watchInfoByte)
-				_, err = ex.jobWatcherClient.client.WatchJob(ex.jobWatcherClient.ctx, &watchInfoRequest)
+				_, err = ex.jobWatcherClient.client.WatchJob(ctx, &watchInfoRequest)
 				if err != nil {
 					return
 				}
@@ -270,7 +234,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 				)
 
 				if err = httpClient.RunParagraphSync(info.NoteID, Pa.Conf); err != nil {
-					_ = constants.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+					_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 					rep.State = constants.StatusFailed
 					rep.Message = fmt.Sprint(err)
 					return
@@ -278,20 +242,20 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 
 				if Pa.Depends != "" {
 					if err = httpClient.RunParagraphSync(info.NoteID, Pa.Depends); err != nil {
-						_ = constants.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+						_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 						return
 					}
 				}
 
 				if Pa.FuncScala != "" {
 					if err = httpClient.RunParagraphSync(info.NoteID, Pa.FuncScala); err != nil {
-						_ = constants.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+						_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 						return
 					}
 				}
 
 				if err = httpClient.RunParagraphSync(info.NoteID, Pa.MainRun); err != nil {
-					_ = constants.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+					_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 					return
 				}
 
@@ -302,7 +266,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 				}
 				rep.Message = result
 
-				_ = constants.ModifyStatus(ctx, ID, rep.State, result, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+				_ = functions.ModifyStatus(ctx, ID, rep.State, result, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 				if err = httpClient.DeleteNote(info.NoteID); err != nil {
 					ex.logger.Error().Msg("can't delete the job note").String("jobid", ID).Fire()
 				}
@@ -314,7 +278,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 				)
 
 				if err = httpClient.RunParagraphSync(info.NoteID, Pa.Conf); err != nil {
-					_ = constants.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+					_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 					rep.State = constants.StatusFailed
 					rep.Message = fmt.Sprint(err)
 					return
@@ -322,14 +286,14 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 
 				if Pa.Depends != "" {
 					if err = httpClient.RunParagraphSync(info.NoteID, Pa.Depends); err != nil {
-						_ = constants.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+						_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 						return
 					}
 				}
 
 				if Pa.FuncScala != "" {
 					if err = httpClient.RunParagraphSync(info.NoteID, Pa.FuncScala); err != nil {
-						_ = constants.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+						_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 						return
 					}
 				}
@@ -347,7 +311,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 					rep.Message = "syntax check success"
 				}
 
-				_ = constants.ModifyStatus(ctx, ID, rep.State, rep.Message, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+				_ = functions.ModifyStatus(ctx, ID, rep.State, rep.Message, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 				if err = httpClient.DeleteNote(info.NoteID); err != nil {
 					ex.logger.Error().Msg("can't delete the job note").String("jobid", ID).Fire()
 				}
@@ -368,14 +332,14 @@ func (ex *JobmanagerExecutor) GetJobState(ctx context.Context, ID string) (rep j
 		return
 	}
 
-	rep.State = constants.StringStatusToInt32(job.Status)
+	rep.State = functions.StringStatusToInt32(job.Status)
 	rep.Message = job.Message
 	return
 }
 
-func (ex *JobmanagerExecutor) GetJobInfo(ctx context.Context, ID string) (job constants.JobmanagerInfo, err error) {
+func (ex *JobmanagerExecutor) GetJobInfo(ctx context.Context, ID string) (job functions.JobmanagerInfo, err error) {
 	db := ex.db.WithContext(ctx)
-	err = db.Table(constants.JobmanagerTableName).Select("noteid, status,message,enginetype,zeppelinserver").Where("id = '" + ID + "'").Scan(&job).Error
+	err = db.Table(functions.JobmanagerTableName).Select("noteid, status,message,enginetype,zeppelinserver").Where("id = '" + ID + "'").Scan(&job).Error
 	return
 }
 
@@ -386,7 +350,7 @@ func (ex *JobmanagerExecutor) CancelJob(ctx context.Context, ID string) (err err
 		return
 	}
 	ex.logger.Warn().Msg("user cancel job").String("id", ID).Any("", job).Fire() // if use cancel.  log is necessary
-	httpClient := constants.NewHttpClient(job.ZeppelinServer)
+	httpClient := functions.NewHttpClient(job.ZeppelinServer)
 	err = httpClient.StopAllParagraphs(job.NoteID)
 	if job.EngineType == constants.ServerTypeFlink {
 		//TODO savepoint at here
@@ -396,11 +360,11 @@ func (ex *JobmanagerExecutor) CancelJob(ctx context.Context, ID string) (err err
 
 func (ex *JobmanagerExecutor) CancelAllJob(ctx context.Context, SpaceID string) (err error) {
 	var (
-		jobs []constants.JobmanagerInfo
+		jobs []functions.JobmanagerInfo
 	)
 
 	db := ex.db.WithContext(ctx)
-	if err = db.Table(constants.JobmanagerTableName).Select("id").Where("spaceid = '" + SpaceID + "' and status = '" + constants.StatusRunningString + "'").Scan(&jobs).Error; err != nil {
+	if err = db.Table(functions.JobmanagerTableName).Select("id").Where("spaceid = '" + SpaceID + "' and status = '" + constants.StatusRunningString + "'").Scan(&jobs).Error; err != nil {
 		ex.logger.Error().Msg("can't scan jobmanager table for cancel all job").Fire()
 		return
 	}

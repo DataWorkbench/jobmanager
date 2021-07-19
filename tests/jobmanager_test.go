@@ -111,9 +111,7 @@ func mainInit(t *testing.T, manualInit bool) {
 	ctx = glog.WithContext(context.Background(), lp)
 
 	conn, err := grpcwrap.NewConn(ctx, &grpcwrap.ClientConfig{
-		Address:      address,
-		LogLevel:     2,
-		LogVerbosity: 99,
+		Address: address,
 	})
 	require.Nil(t, err, "%+v", err)
 	client = jobpb.NewJobmanagerClient(conn)

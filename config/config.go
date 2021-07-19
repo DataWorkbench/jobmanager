@@ -25,9 +25,9 @@ const (
 // Config is the configuration settings for spacemanager
 type Config struct {
 	LogLevel            int8                   `json:"log_level"      yaml:"log_level"      env:"LOG_LEVEL" validate:"gte=1,lte=5"`
-	ZeppelinScaleServer string                 `json:"zeppelin_scale_server"      yaml:"zeppelin_scale_server"      env:"ZEPPELIN_SCALE_SERVER" validate:"required"`
-	JobDeveloperServer  string                 `json:"jobdeveloper_server"      yaml:"jobdeveloper_server"      env:"JOBDEVELOPER_SERVER" validate:"required"`
-	JobWatcherServer    string                 `json:"jobwatcher_server"      yaml:"jobwatcher_server"      env:"JOBWATCHER_SERVER" validate:"required"`
+	ZeppelinScaleServer *grpcwrap.ClientConfig `json:"zeppelin_scale_server"      yaml:"zeppelin_scale_server"      env:"ZEPPELIN_SCALE_SERVER" validate:"required"`
+	JobDeveloperServer  *grpcwrap.ClientConfig `json:"jobdeveloper_server"      yaml:"jobdeveloper_server"      env:"JOBDEVELOPER_SERVER" validate:"required"`
+	JobWatcherServer    *grpcwrap.ClientConfig `json:"jobwatcher_server"      yaml:"jobwatcher_server"      env:"JOBWATCHER_SERVER" validate:"required"`
 	GRPCServer          *grpcwrap.ServerConfig `json:"grpc_server"    yaml:"grpc_server"    env:"GRPC_SERVER"         validate:"required"`
 	MetricsServer       *metrics.Config        `json:"metrics_server" yaml:"metrics_server" env:"METRICS_SERVER"      validate:"required"`
 	MySQL               *gormwrap.MySQLConfig  `json:"mysql"          yaml:"mysql"          env:"MYSQL"               validate:"required"`

@@ -20,7 +20,7 @@ import (
 	"github.com/DataWorkbench/common/metrics"
 	"github.com/DataWorkbench/gproto/pkg/jobpb"
 
-	"github.com/DataWorkbench/common/constants"
+	"github.com/DataWorkbench/common/functions"
 	"github.com/DataWorkbench/jobmanager/config"
 	"github.com/DataWorkbench/jobmanager/executor"
 )
@@ -42,11 +42,17 @@ func Start() (err error) {
 	ctx := glog.WithContext(context.Background(), lp)
 
 	var (
-		db           *gorm.DB
-		rpcServer    *grpcwrap.Server
-		metricServer *metrics.Server
-		tracer       trace.Tracer
-		tracerCloser io.Closer
+		db                  *gorm.DB
+		rpcServer           *grpcwrap.Server
+		metricServer        *metrics.Server
+		tracer              trace.Tracer
+		tracerCloser        io.Closer
+		jobdevConn          *grpcwrap.ClientConn
+		jobdevClient        functions.JobdevClient
+		jobWatcherConn      *grpcwrap.ClientConn
+		jobWatcherClient    executor.JobWatcherClient
+		zeppelinScaleConn   *grpcwrap.ClientConn
+		zeppelinScaleClient executor.ZeppelinScaleClient
 	)
 
 	defer func() {
@@ -74,21 +80,37 @@ func Start() (err error) {
 	if err != nil {
 		return
 	}
-	jobdevClient, tmperr := constants.NewJobdevClient(cfg.JobDeveloperServer)
-	if tmperr != nil {
-		err = tmperr
+
+	jobdevConn, err = grpcwrap.NewConn(ctx, cfg.JobDeveloperServer, grpcwrap.ClientWithTracer(tracer))
+	if err != nil {
 		return
 	}
-	jobWatcherClient, tmperr := executor.NewJobWatcherClient(cfg.JobWatcherServer)
-	if tmperr != nil {
-		err = tmperr
+
+	jobdevClient, err = functions.NewJobdevClient(jobdevConn)
+	if err != nil {
 		return
 	}
-	zeppelinScaleClient, tmperr := executor.NewZeppelinScaleClient(cfg.ZeppelinScaleServer)
-	if tmperr != nil {
-		err = tmperr
+
+	jobWatcherConn, err = grpcwrap.NewConn(ctx, cfg.JobWatcherServer, grpcwrap.ClientWithTracer(tracer))
+	if err != nil {
 		return
 	}
+
+	jobWatcherClient, err = executor.NewJobWatcherClient(jobWatcherConn)
+	if err != nil {
+		return
+	}
+
+	zeppelinScaleConn, err = grpcwrap.NewConn(ctx, cfg.ZeppelinScaleServer, grpcwrap.ClientWithTracer(tracer))
+	if err != nil {
+		return
+	}
+
+	zeppelinScaleClient, err = executor.NewZeppelinScaleClient(zeppelinScaleConn)
+	if err != nil {
+		return
+	}
+
 	rpcServer.Register(func(s *grpc.Server) {
 		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(executor.NewJobManagerExecutor(db, jobdevClient, ctx, lp, jobWatcherClient, zeppelinScaleClient)))
 	})
