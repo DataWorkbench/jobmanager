@@ -207,11 +207,11 @@ func Test_CancelAllJob(t *testing.T) {
 }
 
 func Test_RunJobManual(t *testing.T) {
-	//mainInit(t, true)
-	//var err error
+	mainInit(t, true)
+	var err error
 
-	//_, err = client.Run(ctx, &mw)
-	//require.Nil(t, err, "%+v", err)
+	_, err = client.Run(ctx, &mw)
+	require.Nil(t, err, "%+v", err)
 
 	//_, err = client.RunJob(ctx, &ck)
 	//require.Nil(t, err, "%+v", err)
