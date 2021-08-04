@@ -64,7 +64,7 @@ func NewJobManagerExecutor(db *gorm.DB, job_client functions.JobdevClient, ictx 
 }
 
 func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID string, EngineID string, EngineType string, Command string, JobInfo string) (rep jobpb.JobReply, err error) {
-	if EngineType == constants.ServerTypeFlink {
+	if EngineType == constants.EngineTypeFlink {
 		var (
 			job             constants.FlinkNode
 			req             jobdevpb.JobParserRequest
@@ -90,8 +90,6 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 				rep.Message = fmt.Sprint(err)
 
 				if createRecord == true {
-					//time.Sleep(time.Second * 2) why gorm can't find the new row
-					//TODO lzzhang. here can't find the record in mysql.
 					_ = functions.ModifyStatus(ctx, ID, rep.State, rep.Message, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 				}
 
@@ -142,7 +140,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 			info.UpdateTime = info.CreateTime
 			info.SpaceID = WorkspaceID
 			info.NoteID, err = httpClient.CreateNote(ID)
-			info.EngineType = constants.ServerTypeFlink
+			info.EngineType = constants.EngineTypeFlink
 			info.ZeppelinServer = zeppelinServer.ServerAddress
 			if err != nil {
 				return
@@ -161,15 +159,24 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 				Pa.Depends = ""
 			}
 
-			Pa.FuncScala, err = httpClient.CreateParagraph(info.NoteID, 2, "FuncScala", flinkJobElement.ZeppelinFuncScala)
+			Pa.ScalaUDF, err = httpClient.CreateParagraph(info.NoteID, 2, "ScalaUDF", flinkJobElement.ZeppelinScalaUDF)
 			if err != nil {
 				return
 			}
-			if flinkJobElement.ZeppelinFuncScala == "" {
-				Pa.FuncScala = ""
+			if flinkJobElement.ZeppelinScalaUDF == "" {
+				Pa.ScalaUDF = ""
 			}
 
-			Pa.MainRun, err = httpClient.CreateParagraph(info.NoteID, 3, "JobMainrun", flinkJobElement.ZeppelinMainRun)
+			Pa.PythonUDF, err = httpClient.CreateParagraph(info.NoteID, 3, "PythonUDF", flinkJobElement.ZeppelinPythonUDF)
+			if err != nil {
+				return
+			}
+
+			if flinkJobElement.ZeppelinPythonUDF == "" {
+				Pa.PythonUDF = ""
+			}
+
+			Pa.MainRun, err = httpClient.CreateParagraph(info.NoteID, 4, "JobMainrun", flinkJobElement.ZeppelinMainRun)
 			if err != nil {
 				return
 			}
@@ -208,8 +215,14 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 					}
 				}
 
-				if Pa.FuncScala != "" {
-					if err = httpClient.RunParagraphSync(info.NoteID, Pa.FuncScala); err != nil {
+				if Pa.ScalaUDF != "" {
+					if err = httpClient.RunParagraphSync(info.NoteID, Pa.ScalaUDF); err != nil {
+						return
+					}
+				}
+
+				if Pa.PythonUDF != "" {
+					if err = httpClient.RunParagraphSync(info.NoteID, Pa.PythonUDF); err != nil {
 						return
 					}
 				}
@@ -247,8 +260,15 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 					}
 				}
 
-				if Pa.FuncScala != "" {
-					if err = httpClient.RunParagraphSync(info.NoteID, Pa.FuncScala); err != nil {
+				if Pa.ScalaUDF != "" {
+					if err = httpClient.RunParagraphSync(info.NoteID, Pa.ScalaUDF); err != nil {
+						_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+						return
+					}
+				}
+
+				if Pa.PythonUDF != "" {
+					if err = httpClient.RunParagraphSync(info.NoteID, Pa.PythonUDF); err != nil {
 						_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 						return
 					}
@@ -291,8 +311,15 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 					}
 				}
 
-				if Pa.FuncScala != "" {
-					if err = httpClient.RunParagraphSync(info.NoteID, Pa.FuncScala); err != nil {
+				if Pa.ScalaUDF != "" {
+					if err = httpClient.RunParagraphSync(info.NoteID, Pa.ScalaUDF); err != nil {
+						_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
+						return
+					}
+				}
+
+				if Pa.PythonUDF != "" {
+					if err = httpClient.RunParagraphSync(info.NoteID, Pa.PythonUDF); err != nil {
 						_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
 						return
 					}
@@ -352,7 +379,7 @@ func (ex *JobmanagerExecutor) CancelJob(ctx context.Context, ID string) (err err
 	ex.logger.Warn().Msg("user cancel job").String("id", ID).Any("", job).Fire() // if use cancel.  log is necessary
 	httpClient := functions.NewHttpClient(job.ZeppelinServer)
 	err = httpClient.StopAllParagraphs(job.NoteID)
-	if job.EngineType == constants.ServerTypeFlink {
+	if job.EngineType == constants.EngineTypeFlink {
 		//TODO savepoint at here
 	}
 	return
