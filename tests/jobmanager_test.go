@@ -38,6 +38,7 @@ var jar jobpb.RunJobRequest      //manual test
 var ck jobpb.RunJobRequest       //manual test
 var udfScala jobpb.RunJobRequest //manual test
 var udfJar jobpb.RunJobRequest   //manual test
+var ftp jobpb.RunJobRequest      //manual test
 
 func CreateRandomString(len int) string {
 	var container string
@@ -95,6 +96,7 @@ func mainInit(t *testing.T, manualInit bool) {
 	mspdcancelall2 = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012347","table":"ms","distinct":"ALL","column":[{"field":"id","as":"id"},{"field":"id1","as":""}]}},{"nodetype":"Dest","nodeid":"xx1","upstream":"xx0","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"pd","column":["id","id1"],"id":"sot-0123456789012348"}}]}`}
 	udf = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012347","table":"ms","distinct":"ALL","column":[{"field":"id","as":"id"},{"field":"javatwice(id1)","as":"id1"}]}},{"nodetype":"Dest","nodeid":"xx1","upstream":"xx0","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"pd","column":["id","id1"],"id":"sot-0123456789012348"}}]}`}
 	jar = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":false,"env":{"engine_id":"","parallelism":0,"jobcu":2,"taskcu":2,"tasknum":2,"custom":null},"nodes":[{"nodetype":"Jar","nodeid":"xxxx","upstream":"","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"jar_args":"","jar_entry":"spendreport.FraudDetectionJob","jar_id":"fil-04bbca8755d62131","accesskey":"","secretkey":"","endpoint":"","hbasehosts":""}}]}`}
+	ftp = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012366","table":"ftpsource","distinct":"ALL","column":[{"field":"readName","as":"readName"},{"field":"cellPhone","as":"cellPhone"},{"field":"universityName","as":"universityName"},{"field":"city","as":"city"},{"field":"street","as":"street"},{"field":"ip","as":"ip"}]}},{"nodetype":"Dest","nodeid":"xx1","upstream":"xx0","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"ftpdest","column":["readName","cellPhone","universityName","city","street","ip"],"id":"sot-0123456789012367"}}]}`}
 
 	//mspdcancel = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012348"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012348$qc$ select * from $qc$sot-0123456789012347$qc$"})}
 	//mspdcancelall1 = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012348"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012348$qc$ select * from $qc$sot-0123456789012347$qc$"})}
@@ -223,6 +225,12 @@ func Test_RunJar(t *testing.T) {
 	require.Nil(t, err, "%+v", err)
 }
 
+func Test_RunFtp(t *testing.T) {
+	mainInit(t, false)
+	var err error
+	_, err = client.Run(ctx, &ftp)
+	require.Nil(t, err, "%+v", err)
+}
 
 func Test_RunJobManual(t *testing.T) {
 	mainInit(t, true)
@@ -255,5 +263,3 @@ func Test_RunJobManual(t *testing.T) {
 	//_, err = client.RunJob(ctx, &udfJar)
 	//require.Nil(t, err, "%+v", err)
 }
-
-
