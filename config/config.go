@@ -8,8 +8,8 @@ import (
 
 	"github.com/DataWorkbench/common/gormwrap"
 	"github.com/DataWorkbench/common/grpcwrap"
+	"github.com/DataWorkbench/common/gtrace"
 	"github.com/DataWorkbench/common/metrics"
-	"github.com/DataWorkbench/common/trace"
 	"github.com/DataWorkbench/loader"
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
@@ -27,11 +27,12 @@ type Config struct {
 	LogLevel            int8                   `json:"log_level"      yaml:"log_level"      env:"LOG_LEVEL" validate:"gte=1,lte=5"`
 	ZeppelinScaleServer *grpcwrap.ClientConfig `json:"zeppelin_scale_server"      yaml:"zeppelin_scale_server"      env:"ZEPPELIN_SCALE_SERVER" validate:"required"`
 	JobDeveloperServer  *grpcwrap.ClientConfig `json:"jobdeveloper_server"      yaml:"jobdeveloper_server"      env:"JOBDEVELOPER_SERVER" validate:"required"`
+	EngineManagerServer *grpcwrap.ClientConfig `json:"enginemanager_server"      yaml:"enginemanager_server"      env:"ENGINEMANAGER_SERVER" validate:"required"`
 	JobWatcherServer    *grpcwrap.ClientConfig `json:"jobwatcher_server"      yaml:"jobwatcher_server"      env:"JOBWATCHER_SERVER" validate:"required"`
 	GRPCServer          *grpcwrap.ServerConfig `json:"grpc_server"    yaml:"grpc_server"    env:"GRPC_SERVER"         validate:"required"`
 	MetricsServer       *metrics.Config        `json:"metrics_server" yaml:"metrics_server" env:"METRICS_SERVER"      validate:"required"`
 	MySQL               *gormwrap.MySQLConfig  `json:"mysql"          yaml:"mysql"          env:"MYSQL"               validate:"required"`
-	Tracer              *trace.Config          `json:"tracer"         yaml:"tracer"         env:"TRACER"              validate:"required"`
+	Tracer              *gtrace.Config         `json:"tracer"         yaml:"tracer"         env:"TRACER"              validate:"required"`
 }
 
 func loadFromFile(cfg *Config) (err error) {

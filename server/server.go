@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/DataWorkbench/common/gormwrap"
-	"github.com/DataWorkbench/common/trace"
+	"github.com/DataWorkbench/common/gtrace"
 	"github.com/DataWorkbench/common/utils/buildinfo"
 	"github.com/DataWorkbench/glog"
 	"google.golang.org/grpc"
@@ -45,10 +45,12 @@ func Start() (err error) {
 		db                  *gorm.DB
 		rpcServer           *grpcwrap.Server
 		metricServer        *metrics.Server
-		tracer              trace.Tracer
+		tracer              gtrace.Tracer
 		tracerCloser        io.Closer
 		jobdevConn          *grpcwrap.ClientConn
 		jobdevClient        functions.JobdevClient
+		engineConn          *grpcwrap.ClientConn
+		engineClient        executor.EngineClient
 		jobWatcherConn      *grpcwrap.ClientConn
 		jobWatcherClient    executor.JobWatcherClient
 		zeppelinScaleConn   *grpcwrap.ClientConn
@@ -64,7 +66,7 @@ func Start() (err error) {
 		_ = lp.Close()
 	}()
 
-	tracer, tracerCloser, err = trace.New(cfg.Tracer)
+	tracer, tracerCloser, err = gtrace.New(cfg.Tracer)
 	if err != nil {
 		return
 	}
@@ -91,6 +93,16 @@ func Start() (err error) {
 		return
 	}
 
+	engineConn, err = grpcwrap.NewConn(ctx, cfg.EngineManagerServer, grpcwrap.ClientWithTracer(tracer))
+	if err != nil {
+		return
+	}
+
+	engineClient, err = executor.NewEngineClient(engineConn)
+	if err != nil {
+		return
+	}
+
 	jobWatcherConn, err = grpcwrap.NewConn(ctx, cfg.JobWatcherServer, grpcwrap.ClientWithTracer(tracer))
 	if err != nil {
 		return
@@ -112,7 +124,7 @@ func Start() (err error) {
 	}
 
 	rpcServer.Register(func(s *grpc.Server) {
-		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(executor.NewJobManagerExecutor(db, jobdevClient, ctx, lp, jobWatcherClient, zeppelinScaleClient)))
+		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(executor.NewJobManagerExecutor(db, engineClient, jobdevClient, ctx, lp, jobWatcherClient, zeppelinScaleClient)))
 	})
 
 	// handle signal

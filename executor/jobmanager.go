@@ -12,10 +12,11 @@ import (
 	"github.com/DataWorkbench/common/grpcwrap"
 	"github.com/DataWorkbench/common/utils/idgenerator"
 	"github.com/DataWorkbench/glog"
-	"github.com/DataWorkbench/gproto/pkg/jobdevpb"
-	"github.com/DataWorkbench/gproto/pkg/jobpb"
+	"github.com/DataWorkbench/gproto/pkg/enginepb"
 	"github.com/DataWorkbench/gproto/pkg/jobwpb"
 	"github.com/DataWorkbench/gproto/pkg/model"
+	"github.com/DataWorkbench/gproto/pkg/request"
+	"github.com/DataWorkbench/gproto/pkg/response"
 	"github.com/DataWorkbench/gproto/pkg/zepspb"
 
 	"gorm.io/gorm"
@@ -43,13 +44,14 @@ type JobmanagerExecutor struct {
 	db                  *gorm.DB
 	idGenerator         *idgenerator.IDGenerator
 	jobDevClient        functions.JobdevClient
+	engineClient        EngineClient
 	jobWatcherClient    JobWatcherClient
 	zeppelinScaleClient ZeppelinScaleClient
 	ctx                 context.Context
 	logger              *glog.Logger
 }
 
-func NewJobManagerExecutor(db *gorm.DB, job_client functions.JobdevClient, ictx context.Context, logger *glog.Logger, watcher_client JobWatcherClient, zeppelinscale_client ZeppelinScaleClient) *JobmanagerExecutor {
+func NewJobManagerExecutor(db *gorm.DB, eClient EngineClient, job_client functions.JobdevClient, ictx context.Context, logger *glog.Logger, watcher_client JobWatcherClient, zeppelinscale_client ZeppelinScaleClient) *JobmanagerExecutor {
 	ex := &JobmanagerExecutor{
 		db:                  db,
 		idGenerator:         idgenerator.New(constants.JobIDPrefix),
@@ -58,292 +60,316 @@ func NewJobManagerExecutor(db *gorm.DB, job_client functions.JobdevClient, ictx 
 		logger:              logger,
 		jobWatcherClient:    watcher_client,
 		zeppelinScaleClient: zeppelinscale_client,
+		engineClient:        eClient,
 	}
 
 	return ex
 }
 
-func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID string, EngineID string, EngineType string, Command string, JobInfo string) (rep jobpb.JobReply, err error) {
-	if EngineType == constants.EngineTypeFlink {
-		var (
-			job             constants.FlinkNode
-			req             jobdevpb.JobParserRequest
-			resp            *jobdevpb.JobElement
-			flinkJobElement constants.JobElementFlink
-			info            functions.JobmanagerInfo
-			Pa              constants.FlinkParagraphsInfo
-			httpClient      functions.HttpClient
-			createRecord    bool
-			empty           model.EmptyStruct
-		)
+func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobInfo, cmd string) (jobState response.JobState, err error) {
+	var (
+		zeppelinAddress *response.ZeppelinAddress
+		zeppelinClient  functions.HttpClient
+		jobParserResp   *response.JobParser
+		Pa              constants.FlinkParagraphsInfo
+		noteID          string
+		PaID            string
+	)
 
-		defer func() {
-			if err != nil {
-				if tmp_err := functions.FreeJobResources(ctx, flinkJobElement.Resources, EngineType, ex.logger, httpClient, ex.jobDevClient); tmp_err != nil {
-					ex.logger.Warn().String("can't delete jar", flinkJobElement.Resources.Jar).String("can't FreeEngine", flinkJobElement.Resources.JobID).Fire()
+	defer func() {
+		if err != nil {
+			_ = functions.FreeJobResources(ctx, *jobParserResp.Resources, ex.logger, zeppelinClient, ex.jobDevClient)
+
+			if jobState.Message == "" {
+				jobState.State = int32(constants.StatusFailed)
+				if noteID != "" && PaID != "" {
+					var (
+						output string
+						errerr error
+					)
+
+					output, errerr = zeppelinClient.GetParagraphResultOutput(noteID, PaID)
+					if errerr != nil {
+						jobState.Message = fmt.Sprint(errerr) + "," + fmt.Sprint(err)
+					} else {
+						jobState.Message = output + "," + fmt.Sprint(err)
+					}
+				} else {
+					jobState.Message = fmt.Sprint(err)
 				}
-				if info.NoteID != "" {
-					_ = httpClient.DeleteNote(info.NoteID)
-				}
-
-				rep.State = constants.StatusFailed
-				rep.Message = fmt.Sprint(err)
-
-				if createRecord == true {
-					_ = functions.ModifyStatus(ctx, ID, rep.State, rep.Message, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
-				}
-
 			}
-		}()
 
-		zeppelinServer, tmperr := ex.zeppelinScaleClient.client.GetZeppelinAddress(ctx, &empty)
-		if tmperr != nil {
-			err = tmperr
-			return
+			if noteID != "" {
+				_ = zeppelinClient.DeleteNote(noteID)
+			}
 		}
-		httpClient = functions.NewHttpClient(zeppelinServer.ServerAddress)
+	}()
 
-		if err = json.Unmarshal([]byte(JobInfo), &job); err != nil {
-			return
+	zeppelinAddress, err = ex.zeppelinScaleClient.client.GetZeppelinAddress(ctx, &model.EmptyStruct{})
+	if err != nil {
+		return
+	}
+	zeppelinClient = functions.NewHttpClient(zeppelinAddress.ServerAddress)
+
+	jobParserResp, err = ex.jobDevClient.Client.JobParser(ctx, &request.JobParser{Job: jobInfo, Command: cmd})
+	if err != nil {
+		return
+	}
+
+	if cmd == constants.JobCommandPreview {
+		jobState.State = int32(constants.StatusFinish)
+		if jobParserResp.ZeppelinDepends != "" {
+			jobState.Message += jobParserResp.ZeppelinDepends[strings.Index(jobParserResp.ZeppelinDepends, "\n"):]
 		}
-
-		req.ID = ID
-		req.WorkspaceID = WorkspaceID
-		req.EngineID = EngineID
-		req.EngineType = EngineType
-		req.Command = Command
-		req.JobInfo = JobInfo
-
-		resp, err = ex.jobDevClient.Client.JobParser(ctx, &req)
+		if jobParserResp.ZeppelinMainRun != "" {
+			jobState.Message += jobParserResp.ZeppelinMainRun[strings.Index(jobParserResp.ZeppelinMainRun, "\n"):]
+		}
+		return
+	} else {
+		noteID, err = zeppelinClient.CreateNote(jobInfo.JobID)
 		if err != nil {
 			return
 		}
 
-		if err = json.Unmarshal([]byte(resp.JobElement), &flinkJobElement); err != nil {
+		Pa.Conf, err = zeppelinClient.CreateParagraph(noteID, 0, "JobConf", jobParserResp.ZeppelinConf)
+		if err != nil {
 			return
 		}
 
-		if Command == constants.PreviewCommand {
-			rep.State = constants.StatusFinish
-			if flinkJobElement.ZeppelinDepends != "" {
-				rep.Message += flinkJobElement.ZeppelinDepends[strings.Index(flinkJobElement.ZeppelinDepends, "\n"):]
-			}
-			if flinkJobElement.ZeppelinMainRun != "" {
-				rep.Message += flinkJobElement.ZeppelinMainRun[strings.Index(flinkJobElement.ZeppelinMainRun, "\n"):]
-			}
+		Pa.Depends, err = zeppelinClient.CreateParagraph(noteID, 1, "JobDepends", jobParserResp.ZeppelinDepends)
+		if err != nil {
 			return
-		} else {
-			resourcesByte, _ := json.Marshal(flinkJobElement.Resources)
-			info.Resources = string(resourcesByte)
-			info.ID = ID
-			info.CreateTime = time.Now().Format("2006-01-02 15:04:05")
-			info.UpdateTime = info.CreateTime
-			info.SpaceID = WorkspaceID
-			info.NoteID, err = httpClient.CreateNote(ID)
-			info.EngineType = constants.EngineTypeFlink
-			info.ZeppelinServer = zeppelinServer.ServerAddress
-			if err != nil {
+		}
+		if jobParserResp.ZeppelinDepends == "" {
+			Pa.Depends = ""
+		}
+
+		Pa.ScalaUDF, err = zeppelinClient.CreateParagraph(noteID, 2, "ScalaUDF", jobParserResp.ZeppelinScalaUDF)
+		if err != nil {
+			return
+		}
+		if jobParserResp.ZeppelinScalaUDF == "" {
+			Pa.ScalaUDF = ""
+		}
+
+		Pa.PythonUDF, err = zeppelinClient.CreateParagraph(noteID, 3, "PythonUDF", jobParserResp.ZeppelinPythonUDF)
+		if err != nil {
+			return
+		}
+
+		if jobParserResp.ZeppelinPythonUDF == "" {
+			Pa.PythonUDF = ""
+		}
+
+		Pa.MainRun, err = zeppelinClient.CreateParagraph(noteID, 4, "JobMainrun", jobParserResp.ZeppelinMainRun)
+		if err != nil {
+			return
+		}
+
+		if err = zeppelinClient.RunParagraphSync(noteID, Pa.Conf); err != nil {
+			PaID = Pa.Conf
+			return
+		}
+
+		if Pa.Depends != "" {
+			if err = zeppelinClient.RunParagraphSync(noteID, Pa.Depends); err != nil {
+				PaID = Pa.Depends
+				return
+			}
+		}
+
+		if Pa.ScalaUDF != "" {
+			if err = zeppelinClient.RunParagraphSync(noteID, Pa.ScalaUDF); err != nil {
+				PaID = Pa.ScalaUDF
+				return
+			}
+		}
+
+		if Pa.PythonUDF != "" {
+			if err = zeppelinClient.RunParagraphSync(noteID, Pa.PythonUDF); err != nil {
+				PaID = Pa.PythonUDF
+				return
+			}
+		}
+
+		if cmd == constants.JobCommandExplain {
+			if err = zeppelinClient.RunParagraphSync(noteID, Pa.MainRun); err != nil {
+				PaID = Pa.MainRun
 				return
 			}
 
-			Pa.Conf, err = httpClient.CreateParagraph(info.NoteID, 0, "JobConf", flinkJobElement.ZeppelinConf)
-			if err != nil {
+			explainOutput := ""
+			if explainOutput, err = zeppelinClient.GetParagraphResultOutput(noteID, Pa.MainRun); err != nil {
+				PaID = Pa.MainRun
 				return
 			}
+			jobState.State = int32(constants.StatusFinish)
+			jobState.Message = explainOutput
 
-			Pa.Depends, err = httpClient.CreateParagraph(info.NoteID, 1, "JobDepends", flinkJobElement.ZeppelinDepends)
-			if err != nil {
+			if err = zeppelinClient.DeleteNote(noteID); err != nil {
+				ex.logger.Warn().Msg("can't delete the job note").String("jobid", jobInfo.JobID).Fire()
+				err = nil
+			}
+			noteID = ""
+
+			return
+		} else if cmd == constants.JobCommandSyntax {
+			if err = zeppelinClient.RunParagraphSync(noteID, Pa.MainRun); err != nil {
+				var output string
+
+				if output, err = zeppelinClient.GetParagraphResultOutput(noteID, Pa.MainRun); err != nil {
+					PaID = Pa.MainRun
+					return
+				}
+				result := output[strings.Index(output, "org.apache.flink.table.api."):strings.Index(output, "at org.apache.flink.table.")]
+				jobState.Message = result[strings.Index(result, ":")+1:]
+				jobState.State = int32(constants.StatusFailed)
+				err = nil
+			} else {
+				jobState.State = int32(constants.StatusFinish)
+				jobState.Message = constants.MessageFinish
+			}
+
+			if err = zeppelinClient.DeleteNote(noteID); err != nil {
+				ex.logger.Warn().Msg("can't delete the job note").String("jobid", jobInfo.JobID).Fire()
+				err = nil
+			}
+			noteID = ""
+
+			return
+		} else if cmd == constants.JobCommandRun {
+			var (
+				info functions.JobmanagerInfo
+				//watchInfoRequest jobwpb.WatchJobRequest
+			)
+			if err = zeppelinClient.RunParagraphAsync(noteID, Pa.MainRun); err != nil {
+				PaID = Pa.MainRun
 				return
 			}
-			if flinkJobElement.ZeppelinDepends == "" {
-				Pa.Depends = ""
-			}
-
-			Pa.ScalaUDF, err = httpClient.CreateParagraph(info.NoteID, 2, "ScalaUDF", flinkJobElement.ZeppelinScalaUDF)
-			if err != nil {
-				return
-			}
-			if flinkJobElement.ZeppelinScalaUDF == "" {
-				Pa.ScalaUDF = ""
-			}
-
-			Pa.PythonUDF, err = httpClient.CreateParagraph(info.NoteID, 3, "PythonUDF", flinkJobElement.ZeppelinPythonUDF)
-			if err != nil {
-				return
-			}
-
-			if flinkJobElement.ZeppelinPythonUDF == "" {
-				Pa.PythonUDF = ""
-			}
-
-			Pa.MainRun, err = httpClient.CreateParagraph(info.NoteID, 4, "JobMainrun", flinkJobElement.ZeppelinMainRun)
-			if err != nil {
-				return
-			}
-
+			info.JobID = jobInfo.JobID
+			info.SpaceID = jobInfo.SpaceID
+			info.NoteID = noteID
+			info.Status = constants.StatusRunningString
+			info.Message = constants.MessageRunning
 			PaByte, _ := json.Marshal(Pa)
 			info.Paragraph = string(PaByte)
-			info.Status = constants.StatusRunningString
-			info.Message = constants.JobRunning
+			info.CreateTime = time.Now().Format("2006-01-02 15:04:05")
+			info.UpdateTime = info.CreateTime
+			resourcesByte, _ := json.Marshal(jobParserResp.Resources)
+			info.Resources = string(resourcesByte)
+			info.ZeppelinServer = zeppelinAddress.ServerAddress
+
+			//watchInfo := functions.JobInfoToWatchInfo(info)
+			//watchInfoByte, _ := json.Marshal(watchInfo)
+			//watchInfoRequest.JobInfo = string(watchInfoByte)
+			//_, err = ex.jobWatcherClient.client.WatchJob(ctx, &watchInfoRequest)
+			//if err != nil {
+			//	return
+			//}
+
 			db := ex.db.WithContext(ctx)
 			err = db.Create(info).Error
 			if err != nil {
 				return
 			}
-			createRecord = true
 
-			if Command == constants.RunCommand {
-				var (
-					watchInfo        functions.JobWatchInfo
-					watchInfoRequest jobwpb.WatchJobRequest
-				)
+			jobState.State = int32(constants.StatusRunning)
+			jobState.Message = constants.MessageRunning
 
-				watchInfo.FlinkParagraphIDs = Pa
-				watchInfo.EngineType = EngineType
-				watchInfo.ID = info.ID
-				watchInfo.NoteID = info.NoteID
-				watchInfo.FlinkResources = flinkJobElement.Resources
-				watchInfo.ServerAddr = zeppelinServer.ServerAddress
+			return
+		}
+	}
 
-				if err = httpClient.RunParagraphSync(info.NoteID, Pa.Conf); err != nil {
-					return
-				}
+	return
+}
 
-				if Pa.Depends != "" {
-					if err = httpClient.RunParagraphSync(info.NoteID, Pa.Depends); err != nil {
-						return
-					}
-				}
+func (ex *JobmanagerExecutor) GetState(ctx context.Context, ID string) (jobState response.JobState, err error) {
+	var jobInfo functions.JobmanagerInfo
 
-				if Pa.ScalaUDF != "" {
-					if err = httpClient.RunParagraphSync(info.NoteID, Pa.ScalaUDF); err != nil {
-						return
-					}
-				}
+	jobInfo, err = ex.GetJobInfo(ctx, ID)
+	if err != nil {
+		return
+	}
 
-				if Pa.PythonUDF != "" {
-					if err = httpClient.RunParagraphSync(info.NoteID, Pa.PythonUDF); err != nil {
-						return
-					}
-				}
-
-				if err = httpClient.RunParagraphAsync(info.NoteID, Pa.MainRun); err != nil {
-					return
-				}
-
-				watchInfoByte, _ := json.Marshal(watchInfo)
-				watchInfoRequest.JobInfo = string(watchInfoByte)
-				_, err = ex.jobWatcherClient.client.WatchJob(ctx, &watchInfoRequest)
-				if err != nil {
-					return
-				}
-
-				rep.State = constants.StatusRunning
-				rep.Message = constants.JobRunning
+	if jobInfo.Status == constants.StatusRunningString {
+		job := functions.InitJobInfo(functions.JobInfoToWatchInfo(jobInfo))
+		for true {
+			retjob, _ := functions.GetZeppelinJobState(ctx, job, ex.logger, ex.db, ex.jobDevClient)
+			if retjob.StatusFailedNum == functions.MaxStatusFailedNum {
+				jobState.State = int32(constants.StatusRunning)
+				jobState.Message = constants.MessageUnknowState
 				return
-			} else if Command == constants.ExplainCommand {
-				var (
-					result string
-				)
-
-				if err = httpClient.RunParagraphSync(info.NoteID, Pa.Conf); err != nil {
-					_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
-					rep.State = constants.StatusFailed
-					rep.Message = fmt.Sprint(err)
-					return
-				}
-
-				if Pa.Depends != "" {
-					if err = httpClient.RunParagraphSync(info.NoteID, Pa.Depends); err != nil {
-						_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
-						return
-					}
-				}
-
-				if Pa.ScalaUDF != "" {
-					if err = httpClient.RunParagraphSync(info.NoteID, Pa.ScalaUDF); err != nil {
-						_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
-						return
-					}
-				}
-
-				if Pa.PythonUDF != "" {
-					if err = httpClient.RunParagraphSync(info.NoteID, Pa.PythonUDF); err != nil {
-						_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
-						return
-					}
-				}
-
-				if err = httpClient.RunParagraphSync(info.NoteID, Pa.MainRun); err != nil {
-					_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
-					return
-				}
-
-				if result, err = httpClient.GetParagraphResultOutput(info.NoteID, Pa.MainRun); err != nil {
-					rep.State = constants.StatusFailed
-				} else {
-					rep.State = constants.StatusFinish
-				}
-				rep.Message = result
-
-				_ = functions.ModifyStatus(ctx, ID, rep.State, result, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
-				if err = httpClient.DeleteNote(info.NoteID); err != nil {
-					ex.logger.Error().Msg("can't delete the job note").String("jobid", ID).Fire()
-				}
-
+			} else if retjob.Watch.JobState.State != int32(constants.StatusRunning) {
+				jobState = retjob.Watch.JobState
 				return
-			} else if Command == constants.SyntaxCheckCommand {
-				var (
-					result string
-				)
+			} else {
+				time.Sleep(time.Second)
+				job = retjob
+			}
+		}
 
-				if err = httpClient.RunParagraphSync(info.NoteID, Pa.Conf); err != nil {
-					_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
-					rep.State = constants.StatusFailed
-					rep.Message = fmt.Sprint(err)
-					return
-				}
+	} else {
+		jobState.State = functions.StringStatusToInt32(jobInfo.Status)
+		jobState.Message = jobInfo.Message
+	}
 
-				if Pa.Depends != "" {
-					if err = httpClient.RunParagraphSync(info.NoteID, Pa.Depends); err != nil {
-						_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
-						return
-					}
-				}
+	return
+}
 
-				if Pa.ScalaUDF != "" {
-					if err = httpClient.RunParagraphSync(info.NoteID, Pa.ScalaUDF); err != nil {
-						_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
-						return
-					}
-				}
+func (ex *JobmanagerExecutor) GetJobInfo(ctx context.Context, ID string) (job functions.JobmanagerInfo, err error) {
+	db := ex.db.WithContext(ctx)
+	err = db.Table(functions.JobTableName).Select("*").Where("jobid = '" + ID + "'").Scan(&job).Error
+	return
+}
 
-				if Pa.PythonUDF != "" {
-					if err = httpClient.RunParagraphSync(info.NoteID, Pa.PythonUDF); err != nil {
-						_ = functions.ModifyStatus(ctx, ID, constants.StatusFailed, fmt.Sprint(err), flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
-						return
-					}
-				}
+func (ex *JobmanagerExecutor) CancelJob(ctx context.Context, jobID string) (err error) {
+	var jobInfo functions.JobmanagerInfo
 
-				if err = httpClient.RunParagraphSync(info.NoteID, Pa.MainRun); err != nil {
-					rep.State = constants.StatusFailed
-					if result, err = httpClient.GetParagraphResultOutput(info.NoteID, Pa.MainRun); err != nil {
-						rep.Message = "syntax check failed, can't get failed message."
-					} else {
-						result1 := result[strings.Index(result, "org.apache.flink.table.api."):strings.Index(result, "at org.apache.flink.table.")]
-						rep.Message = result1[strings.Index(result1, ":")+1:]
-					}
-				} else {
-					rep.State = constants.StatusFinish
-					rep.Message = "syntax check success"
-				}
+	jobInfo, err = ex.GetJobInfo(ctx, jobID)
+	if err != nil {
+		return
+	}
 
-				_ = functions.ModifyStatus(ctx, ID, rep.State, rep.Message, flinkJobElement.Resources, EngineType, ex.db, ex.logger, httpClient, ex.jobDevClient)
-				if err = httpClient.DeleteNote(info.NoteID); err != nil {
-					ex.logger.Error().Msg("can't delete the job note").String("jobid", ID).Fire()
-				}
+	ex.logger.Warn().Msg("user cancel job").String("jobid", jobID).Any("", jobInfo).Fire() // if use cancel.  log is necessary
+	zeppelinClient := functions.NewHttpClient(jobInfo.ZeppelinServer)
+	err = zeppelinClient.StopAllParagraphs(jobInfo.NoteID)
+	if err != nil {
+		return
+	}
 
-				return
+	if err = functions.ModifyState(ctx, jobInfo.JobID, int32(constants.StatusTerminated), "user cancel job", ex.db); err != nil {
+		ex.logger.Error().Msg("can't change the job status to terminated").String("jobid", jobInfo.JobID).Fire()
+		return
+	}
+
+	if err = zeppelinClient.DeleteNote(jobInfo.NoteID); err != nil {
+		ex.logger.Error().Msg("can't delete the note").String("noteid", jobInfo.NoteID).String("jobid", jobInfo.JobID).String("error msg", err.Error()).Fire()
+		err = nil
+	}
+
+	_ = functions.FreeJobResources(ctx, functions.JobInfoToWatchInfo(jobInfo).FlinkResources, ex.logger, zeppelinClient, ex.jobDevClient)
+
+	return
+}
+
+func (ex *JobmanagerExecutor) CancelAllJob(ctx context.Context, SpaceIDs []string) (err error) {
+	db := ex.db.WithContext(ctx)
+	for _, SpaceID := range SpaceIDs {
+		var (
+			jobs []functions.JobmanagerInfo
+		)
+
+		if err = db.Table(functions.JobTableName).Select("jobid").Where("spaceid = ? and status = ? ", SpaceID, constants.StatusRunningString).Scan(&jobs).Error; err != nil {
+			ex.logger.Error().Msg("can't scan jobmanager table for cancel all job").Fire()
+			return
+		}
+
+		for _, job := range jobs {
+			tmperr := ex.CancelJob(ctx, job.JobID)
+			if tmperr == nil {
+				ex.logger.Info().String("cancel all running jobid", job.JobID).Fire()
+			} else {
+				ex.logger.Error().String("cancel all running jobid", job.JobID).Fire()
 			}
 		}
 	}
@@ -351,59 +377,12 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, ID string, WorkspaceID
 	return
 }
 
-func (ex *JobmanagerExecutor) GetJobState(ctx context.Context, ID string) (rep jobpb.JobReply, err error) {
-	job, tmperr := ex.GetJobInfo(ctx, ID)
-
-	if tmperr != nil {
-		err = tmperr
-		return
-	}
-
-	rep.State = functions.StringStatusToInt32(job.Status)
-	rep.Message = job.Message
+func (ex *JobmanagerExecutor) NodeRelations(ctx context.Context) (resp *response.NodeRelations, err error) {
+	resp, err = ex.jobDevClient.Client.NodeRelations(ctx, &model.EmptyStruct{})
 	return
 }
 
-func (ex *JobmanagerExecutor) GetJobInfo(ctx context.Context, ID string) (job functions.JobmanagerInfo, err error) {
-	db := ex.db.WithContext(ctx)
-	err = db.Table(functions.JobmanagerTableName).Select("noteid, status,message,enginetype,zeppelinserver").Where("id = '" + ID + "'").Scan(&job).Error
-	return
-}
-
-func (ex *JobmanagerExecutor) CancelJob(ctx context.Context, ID string) (err error) {
-	job, tmperr := ex.GetJobInfo(ctx, ID)
-	if tmperr != nil {
-		err = tmperr
-		return
-	}
-	ex.logger.Warn().Msg("user cancel job").String("id", ID).Any("", job).Fire() // if use cancel.  log is necessary
-	httpClient := functions.NewHttpClient(job.ZeppelinServer)
-	err = httpClient.StopAllParagraphs(job.NoteID)
-	if job.EngineType == constants.EngineTypeFlink {
-		//TODO savepoint at here
-	}
-	return
-}
-
-func (ex *JobmanagerExecutor) CancelAllJob(ctx context.Context, SpaceID string) (err error) {
-	var (
-		jobs []functions.JobmanagerInfo
-	)
-
-	db := ex.db.WithContext(ctx)
-	if err = db.Table(functions.JobmanagerTableName).Select("id").Where("spaceid = '" + SpaceID + "' and status = '" + constants.StatusRunningString + "'").Scan(&jobs).Error; err != nil {
-		ex.logger.Error().Msg("can't scan jobmanager table for cancel all job").Fire()
-		return
-	}
-
-	for _, job := range jobs {
-		tmperr := ex.CancelJob(ctx, job.ID)
-		if tmperr == nil {
-			ex.logger.Info().String("cancel all running job for spaceid", SpaceID).String("jobid", job.ID).Fire()
-		} else {
-			ex.logger.Error().String("cancel all running job for spaceid", SpaceID).String("jobid", job.ID).Fire()
-		}
-	}
-
+func (ex *JobmanagerExecutor) CleanJob(ctx context.Context, jobID string) (err error) {
+	_, err = ex.engineClient.client.Delete(ctx, &enginepb.DeleteFlinkRequest{Name: jobID})
 	return
 }

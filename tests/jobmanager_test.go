@@ -24,21 +24,23 @@ import (
 )
 
 var mspd jobpb.RunJobRequest           //regress test
-var mw jobpb.RunJobRequest             //manual test
 var mspdcancel jobpb.RunJobRequest     //regress test
 var mspdcancelall1 jobpb.RunJobRequest //regress test
 var mspdcancelall2 jobpb.RunJobRequest //regress test
 var udf jobpb.RunJobRequest            //manual test
 
-var mspdpg jobpb.RunJobRequest   //manual test
-var mw_old jobpb.RunJobRequest   //manual test
-var mc jobpb.RunJobRequest       //manual test
-var s3 jobpb.RunJobRequest       //manual test
-var jar jobpb.RunJobRequest      //manual test
-var ck jobpb.RunJobRequest       //manual test
-var udfScala jobpb.RunJobRequest //manual test
-var udfJar jobpb.RunJobRequest   //manual test
-var ftp jobpb.RunJobRequest      //manual test
+//TODO
+//var pg jobpb.RunJobRequest       //manual test
+//var s3 jobpb.RunJobRequest           //manual test
+//var ck jobpb.RunJobRequest           //manual test
+//var hdfs jobpb.RunJobRequest           //manual test
+//var ftp jobpb.RunJobRequest           //manual test
+var mw jobpb.RunJobRequest           //manual test
+var SqlJobAndUdf jobpb.RunJobRequest //manual test
+var Hbase jobpb.RunJobRequest        //manual test
+var PythonTable jobpb.RunJobRequest  //manual test
+var PythonPrint jobpb.RunJobRequest  //manual test
+var ScalaPrint jobpb.RunJobRequest   //manual test
 
 func CreateRandomString(len int) string {
 	var container string
@@ -75,22 +77,16 @@ func mainInit(t *testing.T, manualInit bool) {
 	db.Exec("insert into ms values(2, 2)")
 	db.Exec("insert into workspace values('wks-0123456789012345', 'usr-ndcbIwIa', 'lzz', 'lzz', 1, now(), now());")
 	if manualInit == true {
-		db.Exec("CREATE TABLE IF NOT EXISTS mc(rate bigint, dbmoney varchar(10))")
-		db.Exec("CREATE TABLE IF NOT EXISTS mcd(total bigint)")
 		db.Exec("CREATE TABLE IF NOT EXISTS mw(rate bigint, dbmoney varchar(10))")
 		db.Exec("CREATE TABLE IF NOT EXISTS mwd(total bigint)")
-		db.Exec("insert into mc values(2, 'EUR')")
-		db.Exec("insert into mc values(7, 'USD')")
 		db.Exec("insert into mw values(2, 'EUR')")
 		db.Exec("insert into mw values(7, 'USD')")
-		db.Exec("CREATE TABLE IF NOT EXISTS udfs(a varchar(10))")
-		db.Exec("CREATE TABLE IF NOT EXISTS udfd(a varchar(10))")
-		db.Exec("insert into udfs values('abcdef')")
 	}
 	spaceID45 = "wks-0123456789012345"
 
 	mspd = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012347","table":"ms","distinct":"ALL","column":[{"field":"id","as":"id"},{"field":"id1","as":""}]}},{"nodetype":"Dest","nodeid":"xx1","upstream":"xx0","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"pd","column":["id","id1"],"id":"sot-0123456789012348"}}]}`}
 	mw = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012346","table":"billing as k","distinct":"ALL","column":[{"field":"k.paycount * r.rate","as":"stotal"}]}},{"nodetype":"Source","nodeid":"rxx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012355","table":"mw FOR SYSTEM_TIME AS OF k.tproctime AS r","distinct":"ALL","column":null}},{"nodetype":"Join","nodeid":"xx1","upstream":"xx0","upstreamright":"rxx0","downstream":"xx2","pointx":"","pointy":"","property":{"join":"JOIN","expression":"r.dbmoney = k.paymoney","column":[{"field":"stotal","as":""}]}},{"nodetype":"Dest","nodeid":"xx2","upstream":"xx1","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"mwd","column":["total"],"id":"sot-0123456789012356"}}]}`}
+	//{"paycount": 2, "paymoney": "EUR"} {"paycount": 1, "paymoney": "USD"}
 	mspdcancel = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012347","table":"ms","distinct":"ALL","column":[{"field":"id","as":"id"},{"field":"id1","as":""}]}},{"nodetype":"Dest","nodeid":"xx1","upstream":"xx0","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"pd","column":["id","id1"],"id":"sot-0123456789012348"}}]}`}
 	mspdcancelall1 = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012347","table":"ms","distinct":"ALL","column":[{"field":"id","as":"id"},{"field":"id1","as":""}]}},{"nodetype":"Dest","nodeid":"xx1","upstream":"xx0","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"pd","column":["id","id1"],"id":"sot-0123456789012348"}}]}`}
 	mspdcancelall2 = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012347","table":"ms","distinct":"ALL","column":[{"field":"id","as":"id"},{"field":"id1","as":""}]}},{"nodetype":"Dest","nodeid":"xx1","upstream":"xx0","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"pd","column":["id","id1"],"id":"sot-0123456789012348"}}]}`}
@@ -98,18 +94,15 @@ func mainInit(t *testing.T, manualInit bool) {
 	jar = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":false,"env":{"engine_id":"","parallelism":0,"jobcu":2,"taskcu":2,"tasknum":2,"custom":null},"nodes":[{"nodetype":"Jar","nodeid":"xxxx","upstream":"","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"jar_args":"","jar_entry":"spendreport.FraudDetectionJob","jar_id":"fil-04bbca8755d62131","accesskey":"","secretkey":"","endpoint":"","hbasehosts":""}}]}`}
 	ftp = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012366","table":"ftpsource","distinct":"ALL","column":[{"field":"readName","as":"readName"},{"field":"cellPhone","as":"cellPhone"},{"field":"universityName","as":"universityName"},{"field":"city","as":"city"},{"field":"street","as":"street"},{"field":"ip","as":"ip"}]}},{"nodetype":"Dest","nodeid":"xx1","upstream":"xx0","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"ftpdest","column":["readName","cellPhone","universityName","city","street","ip"],"id":"sot-0123456789012367"}}]}`}
 
-	//mspdcancel = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012348"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012348$qc$ select * from $qc$sot-0123456789012347$qc$"})}
-	//mspdcancelall1 = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012348"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012348$qc$ select * from $qc$sot-0123456789012347$qc$"})}
-	//mspdcancelall2 = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012348"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012348$qc$ select * from $qc$sot-0123456789012347$qc$"})}
-	//mspdpg = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012347", "sot-0123456789012345"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012345$qc$ select * from $qc$sot-0123456789012347$qc$"})}
-	//mc = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012357", "sot-0123456789012358", "sot-0123456789012346"}, MainRun: "insert into $qc$sot-0123456789012358$qc$ select  $qc$sot-0123456789012357$qc$.rate * $qc$sot-0123456789012346$qc$.paycount from  $qc$sot-0123456789012357$qc$, $qc$sot-0123456789012346$qc$ where $qc$sot-0123456789012346$qc$.paymoney =  $qc$sot-0123456789012357$qc$.dbmoney  "})}
-	//{"paycount": 2, "paymoney": "EUR"} {"paycount": 1, "paymoney": "USD"}
-	//mw_old = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012355", "sot-0123456789012356", "sot-0123456789012346"}, Parallelism: 2, JobCpu: 2, JobMem: 2, TaskCpu: 0.2, TaskMem: 256, TaskNum: 2, MainRun: "insert into $qc$sot-0123456789012356$qc$ SELECT k.paycount * r.rate FROM $qc$sot-0123456789012346$qc$ AS k JOIN $qc$sot-0123456789012355$qc$ FOR SYSTEM_TIME AS OF k.tproctime AS r ON r.dbmoney = k.paymoney "})}
-	//jar = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkJob, Depends: typeToJsonString(constants.FlinkJob{Parallelism: 2, JobCpu: 2, JobMem: 2, TaskCpu: 0.2, TaskMem: 2, TaskNum: 2, JarArgs: "", JarEntry: "org.apache.flink.streaming.examples.wordcount.WordCount", MainRun: "/home/lzzhang/bigdata/flink-bin-download/flink-job-artifacts/WordCount.jar"})}
 	//s3 = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012359", "sot-0123456789012360"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012360$qc$ select * from $qc$sot-0123456789012359$qc$"})}
 	//ck = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012361"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012361$qc$ values(6, 6)"})}
-	//udfScala = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012362", "sot-0123456789012363"}, Funcs: []string{"udf-0123456789012345"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012363$qc$ select $qc$udf-0123456789012345$qc$(a) from $qc$sot-0123456789012362$qc$"})}
-	//udfJar = jobpb.RunJobRequest{ID: CreateRandomString(20), WorkspaceID: spaceID45, NodeType: constants.NodeTypeFlinkSSQL, Depends: typeToJsonString(constants.FlinkSSQL{Tables: []string{"sot-0123456789012362", "sot-0123456789012363"}, Funcs: []string{"udf-0123456789012351"}, Parallelism: 2, MainRun: "insert into $qc$sot-0123456789012363$qc$ select $qc$udf-0123456789012351$qc$(a) from $qc$sot-0123456789012362$qc$"})}
+	SqlJobAndUdf = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Sql","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"sql":"\n\ndrop table if exists pd;\ncreate table pd\n(id bigint , id1 bigint COMMENT 'xxx' , PRIMARY KEY (id) NOT ENFORCED) WITH (\n'connector' = 'jdbc',\n'url' = 'jdbc:mysql://dataworkbench-db:3306/data_workbench',\n'table-name' = 'pd',\n'username' = 'root',\n'password' = 'password'\n);\n\n\ndrop table if exists ms;\ncreate table ms\n(id bigint , id1 bigint COMMENT 'xxx' , PRIMARY KEY (id) NOT ENFORCED) WITH (\n'connector' = 'jdbc',\n'url' = 'jdbc:mysql://dataworkbench-db:3306/data_workbench',\n'table-name' = 'ms',\n'username' = 'root',\n'password' = 'password'\n);\n\n\n\n\ninsert into pd(id,id1)  select ALL plus_one(id) as id, ascii(python_upper('a')) from ms "}}]}`}
+	//insert into pd(id,id1)  select ALL id as id,id1 from ms
+	// = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: }
+	Hbase = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012364","table":"testsource","distinct":"ALL","column":[{"field":"rowkey","as":""},{"field":"columna","as":""}]}},{"nodetype":"Dest","nodeid":"xx1","upstream":"xx0","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"testdest","column":["rowkey","columna"],"id":"sot-0123456789012365"}}]}`}
+	PythonTable = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Python","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"code":"from pyflink.datastream import StreamExecutionEnvironment, TimeCharacteristic \nfrom pyflink.table import StreamTableEnvironment, EnvironmentSettings \ndef insertselect():\n    t_env = StreamTableEnvironment.create(stream_execution_environment=s_env)\n    source_ddl = \"create table ms(id bigint , id1 bigint COMMENT 'xxx' , PRIMARY KEY (id) NOT ENFORCED) WITH ('connector' = 'jdbc','url' = 'jdbc:mysql://dataworkbench-db:3306/data_workbench','table-name' = 'ms','username' = 'root','password' = 'password')\" \n    sink_ddl =   \"create table pd(id bigint , id1 bigint COMMENT 'xxx' , PRIMARY KEY (id) NOT ENFORCED) WITH ('connector' = 'jdbc','url' = 'jdbc:mysql://dataworkbench-db:3306/data_workbench','table-name' = 'pd','username' = 'root','password' = 'password')\" \n    t_env.execute_sql(source_ddl) \n    t_env.execute_sql(sink_ddl) \n    t_env.sql_query(\"SELECT * FROM ms\").insert_into(\"pd\") \n    t_env.execute(\"demo\") \nif __name__ == '__main__':\n    insertselect()"}}]}`}
+	PythonPrint = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Python","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"code":"print('hello world')"}}]}`}
+	ScalaPrint = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Scala","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"code":"println(\"hello world\")"}}]}`}
 
 	address := "127.0.0.1:9105"
 	lp := glog.NewDefault()
@@ -197,6 +190,7 @@ func Test_CancelJob(t *testing.T) {
 func Test_CancelAllJob(t *testing.T) {
 	//	var req jobpb.CancelAllJobRequest
 	//	var err error
+	// TODO
 	//
 	//	mainInit(t, false)
 	//
@@ -232,34 +226,26 @@ func Test_RunFtp(t *testing.T) {
 	require.Nil(t, err, "%+v", err)
 }
 
-func Test_RunJobManual(t *testing.T) {
+func Test_RunManual(t *testing.T) {
 	mainInit(t, true)
 	var err error
 
 	_, err = client.Run(ctx, &mw)
 	require.Nil(t, err, "%+v", err)
 
-	//_, err = client.RunJob(ctx, &ck)
+	//_, err = client.Run(ctx, &SqlJobAndUdf)
 	//require.Nil(t, err, "%+v", err)
 
-	//_, err = client.RunJob(ctx, &s3)
+	//_, err = client.Run(ctx, &Hbase)
 	//require.Nil(t, err, "%+v", err)
 
-	//_, err = client.RunJob(ctx, &mspdpg)
+	//_, err = client.Run(ctx, &PythonTable)
 	//require.Nil(t, err, "%+v", err)
 
-	//_, err = client.RunJob(ctx, &mc)
+	//_, err = client.Run(ctx, &PythonPrint)
 	//require.Nil(t, err, "%+v", err)
 
-	//_, err = client.RunJob(ctx, &mw_old)
+	//_, err = client.Run(ctx, &ScalaPrint)
 	//require.Nil(t, err, "%+v", err)
 
-	//_, err = client.RunJob(ctx, &jar)
-	//require.Nil(t, err, "%+v", err)
-
-	//_, err = client.RunJob(ctx, &udfScala)
-	//require.Nil(t, err, "%+v", err)
-
-	//_, err = client.RunJob(ctx, &udfJar)
-	//require.Nil(t, err, "%+v", err)
 }
