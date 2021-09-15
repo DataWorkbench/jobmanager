@@ -12,7 +12,6 @@ import (
 	"github.com/DataWorkbench/common/grpcwrap"
 	"github.com/DataWorkbench/common/utils/idgenerator"
 	"github.com/DataWorkbench/glog"
-	"github.com/DataWorkbench/gproto/pkg/enginepb"
 	"github.com/DataWorkbench/gproto/pkg/jobwpb"
 	"github.com/DataWorkbench/gproto/pkg/model"
 	"github.com/DataWorkbench/gproto/pkg/request"
@@ -78,7 +77,9 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 
 	defer func() {
 		if err != nil {
-			_ = functions.FreeJobResources(ctx, *jobParserResp.Resources, ex.logger, zeppelinClient, ex.jobDevClient)
+			if jobParserResp.Resources != nil {
+				_ = functions.FreeJobResources(ctx, *jobParserResp.Resources, ex.logger, zeppelinClient, ex.jobDevClient)
+			}
 
 			if jobState.Message == "" {
 				jobState.State = int32(constants.StatusFailed)
@@ -251,13 +252,15 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 			info.NoteID = noteID
 			info.Status = constants.StatusRunningString
 			info.Message = constants.MessageRunning
-			PaByte, _ := json.Marshal(Pa)
-			info.Paragraph = string(PaByte)
 			info.CreateTime = time.Now().Format("2006-01-02 15:04:05")
 			info.UpdateTime = info.CreateTime
-			resourcesByte, _ := json.Marshal(jobParserResp.Resources)
-			info.Resources = string(resourcesByte)
 			info.ZeppelinServer = zeppelinAddress.ServerAddress
+			PaByte, _ := json.Marshal(Pa)
+			info.Paragraph = string(PaByte)
+			if jobParserResp.Resources != nil {
+				resourcesByte, _ := json.Marshal(jobParserResp.Resources)
+				info.Resources = string(resourcesByte)
+			}
 
 			//watchInfo := functions.JobInfoToWatchInfo(info)
 			//watchInfoByte, _ := json.Marshal(watchInfo)
@@ -383,6 +386,13 @@ func (ex *JobmanagerExecutor) NodeRelations(ctx context.Context) (resp *response
 }
 
 func (ex *JobmanagerExecutor) CleanJob(ctx context.Context, jobID string) (err error) {
-	_, err = ex.engineClient.client.Delete(ctx, &enginepb.DeleteFlinkRequest{Name: jobID})
+	//_, err = ex.engineClient.client.Delete(ctx, &enginepb.DeleteFlinkRequest{Name: jobID})
+	//if err != nil {
+	//	return
+	//}
+	if err = functions.ModifyState(ctx, jobID, int32(constants.StatusFinish), "finish and clean engine.", ex.db); err != nil {
+		ex.logger.Error().Msg("can't change the job status to terminated").String("jobid", jobID).Fire()
+		return
+	}
 	return
 }

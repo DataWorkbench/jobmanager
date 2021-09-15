@@ -4,36 +4,36 @@
 log_level: 1
 
 zeppelin_scale_server:
-  address: "127.0.0.1:55001"  # required
+  address: "127.0.0.1:9107"  # required
   log_level: 2 #  1 => info, 2 => waring, 3 => error, 4 => fatal
   log_verbosity: 99
 jobdeveloper_server:
-  address: "127.0.0.1:53001"  # required
+  address: "127.0.0.1:9109"  # required
   log_level: 2 #  1 => info, 2 => waring, 3 => error, 4 => fatal
   log_verbosity: 99
 enginemanager_server:
-  address: "127.0.0.1:59001"  # required
+  address: "127.0.0.1:9114"  # required
   log_level: 2 #  1 => info, 2 => waring, 3 => error, 4 => fatal
   log_verbosity: 99
 jobwatcher_server:
-  address: "127.0.0.1:51001"  # required
+  address: "127.0.0.1:9108"  # required
   log_level: 2 #  1 => info, 2 => waring, 3 => error, 4 => fatal
   log_verbosity: 99
 
 grpc_server:
-  address: "127.0.0.1:54001"  # required
+  address: "127.0.0.1:9105"  # required
   log_level: 2 #  1 => info, 2 => waring, 3 => error, 4 => fatal
   log_verbosity: 99
 
 metrics_server:
   enabled: true
-  address: "127.0.0.1:54002" # required when enabled is true
+  address: "127.0.0.1:9205" # required when enabled is true
   url_path: "/metrics"
 
 mysql:
   hosts: "127.0.0.1:3306"  # required
   users: "root"  # required
-  password: "123456"  # required
+  password: "password"  # required
   database: "data_workbench"  # required
   max_idle_conn: 16
   max_open_conn: 128

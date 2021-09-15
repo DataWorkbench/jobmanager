@@ -13,8 +13,8 @@ cloud.google.com/go/storage v1.0.0/go.mod h1:IhtSnM/ZTZV8YYJWCY8RULGVqBDmpoyjwiy
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/DataWorkbench/common v0.0.0-20210914062731-e4245870fbdf h1:b/qFjr1j0FIKThq+y7Y/7fpo9zbCyxbGTnZ7r8yGbf0=
-github.com/DataWorkbench/common v0.0.0-20210914062731-e4245870fbdf/go.mod h1:mhnGs4CSm43xBlQM1kP5XXeI1MSJ8w6u8ECUDj6SZnA=
+github.com/DataWorkbench/common v0.0.0-20210915031702-a486f5bea85b h1:Tf2ezhFCo0zvli6UC0M34ug33pOvr+KtuXE7I5GDTPI=
+github.com/DataWorkbench/common v0.0.0-20210915031702-a486f5bea85b/go.mod h1:mhnGs4CSm43xBlQM1kP5XXeI1MSJ8w6u8ECUDj6SZnA=
 github.com/DataWorkbench/glog v0.0.0-20210809050640-4960fd6de6ab h1:qQ6Nd6amyEXvslSxP+62TITT2fbPHKjt0rbyjzzfoP8=
 github.com/DataWorkbench/glog v0.0.0-20210809050640-4960fd6de6ab/go.mod h1:zymxJLXn162xdWYUqIb729S3ZzRQpdTj/LwnW+xxru4=
 github.com/DataWorkbench/gproto v0.0.0-20210914062113-237d37f17856 h1:RUoqQF/5XiD/Z5Ssk8b/Dw0u+O7/3Ixt/o+3sbxa0sA=
