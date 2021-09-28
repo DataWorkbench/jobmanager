@@ -76,6 +76,13 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 	)
 
 	defer func() {
+		if jobParserResp != nil && cmd != constants.JobCommandRun {
+			//_, terr := ex.engineClient.client.Delete(ctx, &enginepb.DeleteFlinkRequest{Name: jobInfo.JobID})
+			//if terr != nil {
+			//	ex.logger.Warn().Msg("can't delete the engine").String("jobid", jobInfo.JobID).Fire()
+			//}
+		}
+
 		if err != nil {
 			if jobParserResp.Resources != nil {
 				_ = functions.FreeJobResources(ctx, *jobParserResp.Resources, ex.logger, zeppelinClient, ex.jobDevClient)
@@ -114,6 +121,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 
 	jobParserResp, err = ex.jobDevClient.Client.JobParser(ctx, &request.JobParser{Job: jobInfo, Command: cmd})
 	if err != nil {
+		jobParserResp = nil
 		return
 	}
 
