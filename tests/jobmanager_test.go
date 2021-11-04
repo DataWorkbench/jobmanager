@@ -24,9 +24,11 @@ import (
 	"github.com/DataWorkbench/gproto/pkg/request"
 )
 
-var msmd request.JobInfo       //regress test
-var preview_ms request.JobInfo //regress test
-var sql_msmd request.JobInfo   //regress test
+var msmd request.JobInfo         //regress test
+var preview_ms request.JobInfo   //regress test
+var sql_msmd request.JobInfo     //regress test
+var python_print request.JobInfo //regress test
+var scala_print request.JobInfo  //regress test
 //var mspdcancel jobpb.RunJobRequest     //regress test
 //var mspdcancelall1 jobpb.RunJobRequest //regress test
 //var mspdcancelall2 jobpb.RunJobRequest //regress test
@@ -72,9 +74,9 @@ func mainInit(t *testing.T, manualInit bool) {
 	db, cerr := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	require.Nil(t, cerr, "%+v", cerr)
 	db.Exec("CREATE TABLE IF NOT EXISTS ms(id bigint, id1 bigint)")
-	db.Exec("CREATE TABLE IF NOT EXISTS pd(id bigint, id1 bigint)")
+	db.Exec("CREATE TABLE IF NOT EXISTS md(id bigint, id1 bigint)")
 	db.Exec("delete from ms")
-	db.Exec("delete from pd")
+	db.Exec("delete from md")
 	db.Exec("insert into ms values(1, 1)")
 	db.Exec("insert into ms values(2, 2)")
 	db.Exec("insert into workspace values('wks-0123456789012345', 'usr-ndcbIwIa', 'lzz', 'lzz', 1, now(), now());")
@@ -86,9 +88,11 @@ func mainInit(t *testing.T, manualInit bool) {
 	}
 	spaceid = "wks-0000000000000001"
 
-	sql_msmd = request.JobInfo{JobId: "job-0000000000000sql", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_SQL, Sql: &flinkpb.FlinkSQL{Code: "drop table if exists md;\ncreate table md\n(id bigint,id1 bigint) WITH (\n'connector' = 'jdbc',\n'url' = 'jdbc:mysql://127.0.0.1:3306/data_workbench',\n'table-name' = 'md',\n'username' = 'root',\n'password' = 'password'\n);\n\n\ndrop table if exists ms;\ncreate table ms\n(id bigint,id1 bigint) WITH (\n'connector' = 'jdbc',\n'url' = 'jdbc:mysql://127.0.0.1:3306/data_workbench',\n'table-name' = 'ms',\n'username' = 'root',\n'password' = 'password'\n);\n\n\ninsert into md(id,id1) select ALL id as id,id1 from ms \n"}}}
+	sql_msmd = request.JobInfo{JobId: "job-0000000000000sql", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_SQL, Sql: &flinkpb.FlinkSQL{Code: "drop table if exists md;\ncreate table md\n(id bigint,id1 bigint) WITH (\n'connector' = 'jdbc',\n'url' = 'jdbc:mysql://dataworkbench-db:3306/data_workbench',\n'table-name' = 'md',\n'username' = 'root',\n'password' = 'password'\n);\n\n\ndrop table if exists ms;\ncreate table ms\n(id bigint,id1 bigint) WITH (\n'connector' = 'jdbc',\n'url' = 'jdbc:mysql://dataworkbench-db:3306/data_workbench',\n'table-name' = 'ms',\n'username' = 'root',\n'password' = 'password'\n);\n\n\ninsert into md(id,id1) select ALL id as id,id1 from ms \n"}}}
 	msmd = request.JobInfo{JobId: "job-00000source_dest", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Operator, Operators: []*flinkpb.FlinkOperator{&flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Source, Id: "xx0", DownStream: "xx1", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Source: &flinkpb.SourceOperator{TableId: "sot-00000mysqlsource", Column: []*flinkpb.ColumnAs{&flinkpb.ColumnAs{Field: "id"}, &flinkpb.ColumnAs{Field: "id1"}}}}}, &flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Dest, Id: "xx1", Upstream: "xx0", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Dest: &flinkpb.DestOperator{TableId: "sot-0000000mysqldest", Columns: []string{"id", "id1"}}}}}}}
 	preview_ms = request.JobInfo{JobId: "job-00000source_dest", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Operator, Operators: []*flinkpb.FlinkOperator{&flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Source, Id: "xx0", Property: &flinkpb.OperatorProperty{Source: &flinkpb.SourceOperator{TableId: "sot-00000mysqlsource", Column: []*flinkpb.ColumnAs{&flinkpb.ColumnAs{Field: "id"}, &flinkpb.ColumnAs{Field: "id1"}}}}}}}}
+	python_print = request.JobInfo{JobId: "job-0000000000python", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Python, Python: &flinkpb.FlinkPython{Code: "print(\"hello world\")"}}}
+	scala_print = request.JobInfo{JobId: "job-00000000000scala", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Scala, Scala: &flinkpb.FlinkScala{Code: "println(\"hello world\")"}}}
 
 	//mw = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012346","table":"billing as k","distinct":"ALL","column":[{"field":"k.paycount * r.rate","as":"stotal"}]}},{"nodetype":"Source","nodeid":"rxx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012355","table":"mw FOR SYSTEM_TIME AS OF k.tproctime AS r","distinct":"ALL","column":null}},{"nodetype":"Join","nodeid":"xx1","upstream":"xx0","upstreamright":"rxx0","downstream":"xx2","pointx":"","pointy":"","property":{"join":"JOIN","expression":"r.dbmoney = k.paymoney","column":[{"field":"stotal","as":""}]}},{"nodetype":"Dest","nodeid":"xx2","upstream":"xx1","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"mwd","column":["total"],"id":"sot-0123456789012356"}}]}`}
 	////{"paycount": 2, "paymoney": "EUR"} {"paycount": 1, "paymoney": "USD"}
@@ -133,9 +137,13 @@ func Test_Run(t *testing.T) {
 	mainInit(t, false)
 	var err error
 
-	_, err = client.Run(ctx, &sql_msmd)
+	//_, err = client.Run(ctx, &sql_msmd)
+	//require.Nil(t, err, "%+v", err)
+	//_, err = client.Run(ctx, &msmd)
+	//require.Nil(t, err, "%+v", err)
+	_, err = client.Run(ctx, &python_print)
 	require.Nil(t, err, "%+v", err)
-	_, err = client.Run(ctx, &msmd)
+	_, err = client.Run(ctx, &scala_print)
 	require.Nil(t, err, "%+v", err)
 }
 
@@ -143,14 +151,22 @@ func Test_GetState(t *testing.T) {
 	mainInit(t, false)
 	var err error
 
-	req := request.JobGetState{JobId: msmd.JobId}
+	//req := request.JobGetState{JobId: msmd.JobId}
+	//_, err = client.GetState(ctx, &req)
+	//require.Nil(t, err, "%+v", err)
+
+	//req = request.JobGetState{JobId: sql_msmd.JobId}
+	//_, err = client.GetState(ctx, &req)
+	//require.Nil(t, err, "%+v", err)
+	//require.Equal(t, "success", "failed")
+
+	req := request.JobGetState{JobId: python_print.JobId}
 	_, err = client.GetState(ctx, &req)
 	require.Nil(t, err, "%+v", err)
 
-	req = request.JobGetState{JobId: sql_msmd.JobId}
+	req = request.JobGetState{JobId: scala_print.JobId}
 	_, err = client.GetState(ctx, &req)
 	require.Nil(t, err, "%+v", err)
-	//require.Equal(t, "success", "failed")
 }
 
 func Test_OperatorRelations(t *testing.T) {
@@ -175,9 +191,9 @@ func Test_Preview(t *testing.T) {
 func Test_Syntax(t *testing.T) {
 	mainInit(t, false)
 
-	//_, err := client.Syntax(ctx, &msmd)
-	//require.Nil(t, err, "%+v", err)
-	_, err := client.Syntax(ctx, &sql_msmd)
+	_, err := client.Syntax(ctx, &msmd)
+	require.Nil(t, err, "%+v", err)
+	_, err = client.Syntax(ctx, &sql_msmd)
 	require.Nil(t, err, "%+v", err)
 }
 
