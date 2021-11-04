@@ -76,38 +76,23 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 	)
 
 	defer func() {
-		if jobParserResp != nil && cmd != constants.JobCommandRun {
-			//_, terr := ex.engineClient.client.Delete(ctx, &enginepb.DeleteFlinkRequest{Name: jobInfo.JobID})
-			//if terr != nil {
-			//	ex.logger.Warn().Msg("can't delete the engine").String("jobid", jobInfo.JobID).Fire()
-			//}
-		}
-
 		if err != nil {
-			if jobParserResp.Resources != nil {
+			if jobParserResp != nil && jobParserResp.Resources != nil {
 				_ = functions.FreeJobResources(ctx, *jobParserResp.Resources, ex.logger, zeppelinClient, ex.jobDevClient)
 			}
-
-			if jobState.Message == "" {
-				jobState.State = int32(constants.StatusFailed)
-				if noteID != "" && PaID != "" {
-					var (
-						output string
-						errerr error
-					)
-
-					output, errerr = zeppelinClient.GetParagraphResultOutput(noteID, PaID)
-					if errerr != nil {
-						jobState.Message = fmt.Sprint(errerr) + "," + fmt.Sprint(err)
-					} else {
-						jobState.Message = output + "," + fmt.Sprint(err)
-					}
-				} else {
-					jobState.Message = fmt.Sprint(err)
-				}
-			}
-
+			jobState.State = model.StreamJobInst_Failed
 			if noteID != "" {
+				if jobState.Message == "" && PaID != "" {
+					output, err1 := zeppelinClient.GetParagraphResultOutput(noteID, PaID)
+					if err1 != nil {
+						jobState.Message = fmt.Sprint(err1)
+					} else {
+						jobState.Message = output
+					}
+				}
+				jobState.Message += fmt.Sprint(err)
+
+				ex.logger.Warn().Msg("run job error").String("jobid", jobInfo.JobId).Any("errmsg", jobState.Message).Fire()
 				_ = zeppelinClient.DeleteNote(noteID)
 			}
 		}
@@ -126,7 +111,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 	}
 
 	if cmd == constants.JobCommandPreview {
-		jobState.State = int32(constants.StatusFinish)
+		jobState.State = model.StreamJobInst_Succeed
 		if jobParserResp.ZeppelinDepends != "" {
 			jobState.Message += jobParserResp.ZeppelinDepends[strings.Index(jobParserResp.ZeppelinDepends, "\n"):]
 		}
@@ -135,7 +120,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 		}
 		return
 	} else {
-		noteID, err = zeppelinClient.CreateNote(jobInfo.JobID)
+		noteID, err = zeppelinClient.CreateNote(jobInfo.JobId)
 		if err != nil {
 			return
 		}
@@ -165,7 +150,6 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 		if err != nil {
 			return
 		}
-
 		if jobParserResp.ZeppelinPythonUDF == "" {
 			Pa.PythonUDF = ""
 		}
@@ -201,28 +185,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 			}
 		}
 
-		if cmd == constants.JobCommandExplain {
-			if err = zeppelinClient.RunParagraphSync(noteID, Pa.MainRun); err != nil {
-				PaID = Pa.MainRun
-				return
-			}
-
-			explainOutput := ""
-			if explainOutput, err = zeppelinClient.GetParagraphResultOutput(noteID, Pa.MainRun); err != nil {
-				PaID = Pa.MainRun
-				return
-			}
-			jobState.State = int32(constants.StatusFinish)
-			jobState.Message = explainOutput
-
-			if err = zeppelinClient.DeleteNote(noteID); err != nil {
-				ex.logger.Warn().Msg("can't delete the job note").String("jobid", jobInfo.JobID).Fire()
-				err = nil
-			}
-			noteID = ""
-
-			return
-		} else if cmd == constants.JobCommandSyntax {
+		if cmd == constants.JobCommandSyntax {
 			if err = zeppelinClient.RunParagraphSync(noteID, Pa.MainRun); err != nil {
 				var output string
 
@@ -232,15 +195,15 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 				}
 				result := output[strings.Index(output, "org.apache.flink.table.api."):strings.Index(output, "at org.apache.flink.table.")]
 				jobState.Message = result[strings.Index(result, ":")+1:]
-				jobState.State = int32(constants.StatusFailed)
+				jobState.State = model.StreamJobInst_Failed
 				err = nil
 			} else {
-				jobState.State = int32(constants.StatusFinish)
+				jobState.State = model.StreamJobInst_Succeed
 				jobState.Message = constants.MessageFinish
 			}
 
 			if err = zeppelinClient.DeleteNote(noteID); err != nil {
-				ex.logger.Warn().Msg("can't delete the job note").String("jobid", jobInfo.JobID).Fire()
+				ex.logger.Warn().Msg("can't delete the job note").String("jobid", jobInfo.JobId).Fire()
 				err = nil
 			}
 			noteID = ""
@@ -255,13 +218,13 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 				PaID = Pa.MainRun
 				return
 			}
-			info.JobID = jobInfo.JobID
-			info.SpaceID = jobInfo.SpaceID
+			info.JobID = jobInfo.JobId
+			info.SpaceID = jobInfo.SpaceId
 			info.NoteID = noteID
-			info.Status = constants.StatusRunningString
+			info.Status = model.StreamJobInst_Running
 			info.Message = constants.MessageRunning
-			info.CreateTime = time.Now().Format("2006-01-02 15:04:05")
-			info.UpdateTime = info.CreateTime
+			info.Created = time.Now().Unix()
+			info.Updated = info.Created
 			info.ZeppelinServer = zeppelinAddress.ServerAddress
 			PaByte, _ := json.Marshal(Pa)
 			info.Paragraph = string(PaByte)
@@ -284,7 +247,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 				return
 			}
 
-			jobState.State = int32(constants.StatusRunning)
+			jobState.State = model.StreamJobInst_Running
 			jobState.Message = constants.MessageRunning
 
 			return
@@ -302,25 +265,27 @@ func (ex *JobmanagerExecutor) GetState(ctx context.Context, ID string) (jobState
 		return
 	}
 
-	if jobInfo.Status == constants.StatusRunningString {
+	if jobInfo.Status == model.StreamJobInst_Running {
 		job := functions.InitJobInfo(functions.JobInfoToWatchInfo(jobInfo))
 		for true {
 			retjob, _ := functions.GetZeppelinJobState(ctx, job, ex.logger, ex.db, ex.jobDevClient)
-			if retjob.StatusFailedNum == functions.MaxStatusFailedNum {
-				jobState.State = int32(constants.StatusRunning)
-				jobState.Message = constants.MessageUnknowState
-				return
-			} else if retjob.Watch.JobState.State != int32(constants.StatusRunning) {
-				jobState = retjob.Watch.JobState
+			if jobState.State == model.StreamJobInst_Retrying {
+				if retjob.StatusFailedNum >= functions.MaxStatusFailedNum {
+					jobState.State = model.StreamJobInst_Timeout
+					jobState.Message = constants.MessageUnknowState
+				} else {
+					time.Sleep(time.Second)
+					job = retjob
+				}
 				return
 			} else {
-				time.Sleep(time.Second)
-				job = retjob
+				jobState = retjob.Watch.JobState
+				return
 			}
 		}
 
 	} else {
-		jobState.State = functions.StringStatusToInt32(jobInfo.Status)
+		jobState.State = jobInfo.Status
 		jobState.Message = jobInfo.Message
 	}
 
@@ -329,7 +294,7 @@ func (ex *JobmanagerExecutor) GetState(ctx context.Context, ID string) (jobState
 
 func (ex *JobmanagerExecutor) GetJobInfo(ctx context.Context, ID string) (job functions.JobmanagerInfo, err error) {
 	db := ex.db.WithContext(ctx)
-	err = db.Table(functions.JobTableName).Select("*").Where("jobid = '" + ID + "'").Scan(&job).Error
+	err = db.Table(functions.JobTableName).Select("*").Where("job_id = '" + ID + "'").Scan(&job).Error
 	return
 }
 
@@ -348,7 +313,7 @@ func (ex *JobmanagerExecutor) CancelJob(ctx context.Context, jobID string) (err 
 		return
 	}
 
-	if err = functions.ModifyState(ctx, jobInfo.JobID, int32(constants.StatusTerminated), "user cancel job", ex.db); err != nil {
+	if err = functions.ModifyState(ctx, jobInfo.JobID, model.StreamJobInst_Succeed, "user cancel job", ex.db); err != nil {
 		ex.logger.Error().Msg("can't change the job status to terminated").String("jobid", jobInfo.JobID).Fire()
 		return
 	}
@@ -370,7 +335,7 @@ func (ex *JobmanagerExecutor) CancelAllJob(ctx context.Context, SpaceIDs []strin
 			jobs []functions.JobmanagerInfo
 		)
 
-		if err = db.Table(functions.JobTableName).Select("jobid").Where("spaceid = ? and status = ? ", SpaceID, constants.StatusRunningString).Scan(&jobs).Error; err != nil {
+		if err = db.Table(functions.JobTableName).Select("job_id").Where("space_id = ? and status = ? ", SpaceID, model.StreamJobInst_Running).Scan(&jobs).Error; err != nil {
 			ex.logger.Error().Msg("can't scan jobmanager table for cancel all job").Fire()
 			return
 		}
@@ -390,17 +355,5 @@ func (ex *JobmanagerExecutor) CancelAllJob(ctx context.Context, SpaceIDs []strin
 
 func (ex *JobmanagerExecutor) NodeRelations(ctx context.Context) (resp *response.NodeRelations, err error) {
 	resp, err = ex.jobDevClient.Client.NodeRelations(ctx, &model.EmptyStruct{})
-	return
-}
-
-func (ex *JobmanagerExecutor) CleanJob(ctx context.Context, jobID string) (err error) {
-	//_, err = ex.engineClient.client.Delete(ctx, &enginepb.DeleteFlinkRequest{Name: jobID})
-	//if err != nil {
-	//	return
-	//}
-	if err = functions.ModifyState(ctx, jobID, int32(constants.StatusFinish), "finish and clean engine.", ex.db); err != nil {
-		ex.logger.Error().Msg("can't change the job status to terminated").String("jobid", jobID).Fire()
-		return
-	}
 	return
 }

@@ -33,17 +33,14 @@ func (s *JobManagerServer) Syntax(ctx context.Context, req *request.JobInfo) (*r
 	rep, err := s.executor.RunJob(ctx, req, constants.JobCommandSyntax)
 	return &rep, err
 }
+
 func (s *JobManagerServer) Preview(ctx context.Context, req *request.JobInfo) (*response.JobState, error) {
 	rep, err := s.executor.RunJob(ctx, req, constants.JobCommandPreview)
 	return &rep, err
 }
-func (s *JobManagerServer) Explain(ctx context.Context, req *request.JobInfo) (*response.JobState, error) {
-	rep, err := s.executor.RunJob(ctx, req, constants.JobCommandExplain)
-	return &rep, err
-}
 
 func (s *JobManagerServer) CancelJob(ctx context.Context, req *request.JobCancel) (*model.EmptyStruct, error) {
-	err := s.executor.CancelJob(ctx, req.GetJobID())
+	err := s.executor.CancelJob(ctx, req.GetJobId())
 	return &model.EmptyStruct{}, err
 }
 
@@ -52,13 +49,8 @@ func (s *JobManagerServer) CancelAllJob(ctx context.Context, req *request.Delete
 	return &model.EmptyStruct{}, err
 }
 
-func (s *JobManagerServer) CleanJob(ctx context.Context, req *request.JobClean) (*model.EmptyStruct, error) {
-	err := s.executor.CleanJob(ctx, req.GetJobID())
-	return &model.EmptyStruct{}, err
-}
-
 func (s *JobManagerServer) GetState(ctx context.Context, req *request.JobGetState) (*response.JobState, error) {
-	rep, err := s.executor.GetState(ctx, req.GetJobID())
+	rep, err := s.executor.GetState(ctx, req.GetJobId())
 	return &rep, err
 }
 
