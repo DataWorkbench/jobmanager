@@ -1,9 +1,12 @@
 package executor
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -65,6 +68,19 @@ func NewJobManagerExecutor(db *gorm.DB, eClient EngineClient, job_client functio
 	return ex
 }
 
+func CreateRandomString(len int) string {
+	var container string
+	var str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+	b := bytes.NewBufferString(str)
+	length := b.Len()
+	bigInt := big.NewInt(int64(length))
+	for i := 0; i < len; i++ {
+		randomInt, _ := rand.Int(rand.Reader, bigInt)
+		container += string(str[randomInt.Int64()])
+	}
+	return container
+}
+
 func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobInfo, cmd string) (jobState response.JobState, err error) {
 	var (
 		zeppelinAddress *response.ZeppelinAddress
@@ -120,7 +136,11 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 		}
 		return
 	} else {
-		noteID, err = zeppelinClient.CreateNote(jobInfo.JobId)
+		noteName := jobInfo.JobId
+		if cmd == constants.JobCommandSyntax {
+			noteName = "syx-" + CreateRandomString(16)
+		}
+		noteID, err = zeppelinClient.CreateNote(noteName)
 		if err != nil {
 			return
 		}
