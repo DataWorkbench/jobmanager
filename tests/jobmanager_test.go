@@ -24,27 +24,31 @@ import (
 	"github.com/DataWorkbench/gproto/pkg/request"
 )
 
-var msmd request.JobInfo         //regress test
+// from mysql to mysql
+var msmd request.JobInfo //regress test
+
+// from kafka to kafka
+var kafka_source_dest request.JobInfo
+
+// from hdfs to hdfs
+var hdfs_source_dest request.JobInfo
+
+// from s3 to s3
+var s3_source_dest request.JobInfo
+
+// from hbase to hbase
+var hbase_source_dest request.JobInfo
+
+// from pg to pg
+var pg_source_dest request.JobInfo
+
+// from ck to ck
+var ck_source_dest request.JobInfo
+
 var preview_ms request.JobInfo   //regress test
 var sql_msmd request.JobInfo     //regress test
 var python_print request.JobInfo //regress test
 var scala_print request.JobInfo  //regress test
-//var mspdcancel jobpb.RunJobRequest     //regress test
-//var mspdcancelall1 jobpb.RunJobRequest //regress test
-//var mspdcancelall2 jobpb.RunJobRequest //regress test
-//var udf jobpb.RunJobRequest            //manual test
-////TODO
-////var pg jobpb.RunJobRequest       //manual test
-////var s3 jobpb.RunJobRequest           //manual test
-////var ck jobpb.RunJobRequest           //manual test
-////var hdfs jobpb.RunJobRequest           //manual test
-////var ftp jobpb.RunJobRequest           //manual test
-//var mw jobpb.RunJobRequest           //manual test
-//var SqlJobAndUdf jobpb.RunJobRequest //manual test
-//var Hbase jobpb.RunJobRequest        //manual test
-//var PythonTable jobpb.RunJobRequest  //manual test
-//var PythonPrint jobpb.RunJobRequest  //manual test
-//var ScalaPrint jobpb.RunJobRequest   //manual test
 
 func CreateRandomString(len int) string {
 	var container string
@@ -93,6 +97,12 @@ func mainInit(t *testing.T, manualInit bool) {
 	preview_ms = request.JobInfo{JobId: "job-00000source_dest", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Operator, Operators: []*flinkpb.FlinkOperator{&flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Source, Id: "xx0", Property: &flinkpb.OperatorProperty{Source: &flinkpb.SourceOperator{TableId: "sot-00000mysqlsource", Column: []*flinkpb.ColumnAs{&flinkpb.ColumnAs{Field: "id"}, &flinkpb.ColumnAs{Field: "id1"}}}}}}}}
 	python_print = request.JobInfo{JobId: "job-0000000000python", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Python, Python: &flinkpb.FlinkPython{Code: "print(\"hello world\")"}}}
 	scala_print = request.JobInfo{JobId: "job-00000000000scala", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Scala, Scala: &flinkpb.FlinkScala{Code: "println(\"hello world\")"}}}
+	kafka_source_dest = request.JobInfo{JobId: "job-kafkasource_dest", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Operator, Operators: []*flinkpb.FlinkOperator{&flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Source, Id: "xx0", DownStream: "xx1", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Source: &flinkpb.SourceOperator{TableId: "sot-00000kafkasource", Column: []*flinkpb.ColumnAs{&flinkpb.ColumnAs{Field: "paycount"}, &flinkpb.ColumnAs{Field: "paymoney"}}}}}, &flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Dest, Id: "xx1", Upstream: "xx0", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Dest: &flinkpb.DestOperator{TableId: "sot-0000000kafkadest", Columns: []string{"paycount", "paymoney"}}}}}}}
+	hdfs_source_dest = request.JobInfo{JobId: "job-hdfs_source_dest", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Operator, Operators: []*flinkpb.FlinkOperator{&flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Source, Id: "xx0", DownStream: "xx1", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Source: &flinkpb.SourceOperator{TableId: "sot-00000hdfs_source", Column: []*flinkpb.ColumnAs{&flinkpb.ColumnAs{Field: "id"}, &flinkpb.ColumnAs{Field: "id1"}}}}}, &flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Dest, Id: "xx1", Upstream: "xx0", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Dest: &flinkpb.DestOperator{TableId: "sot-0000000hdfs_dest", Columns: []string{"id", "id1"}}}}}}}
+	s3_source_dest = request.JobInfo{JobId: "job-00s3_source_dest", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Operator, Operators: []*flinkpb.FlinkOperator{&flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Source, Id: "xx0", DownStream: "xx1", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Source: &flinkpb.SourceOperator{TableId: "sot-0000000s3_source", Column: []*flinkpb.ColumnAs{&flinkpb.ColumnAs{Field: "id"}, &flinkpb.ColumnAs{Field: "id1"}}}}}, &flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Dest, Id: "xx1", Upstream: "xx0", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Dest: &flinkpb.DestOperator{TableId: "sot-000000000s3_dest", Columns: []string{"id", "id1"}}}}}}}
+	hbase_source_dest = request.JobInfo{JobId: "job-hbasesource_dest", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Operator, Operators: []*flinkpb.FlinkOperator{&flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Source, Id: "xx0", DownStream: "xx1", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Source: &flinkpb.SourceOperator{TableId: "sot-0000hbase_source", Column: []*flinkpb.ColumnAs{&flinkpb.ColumnAs{Field: "rowkey"}, &flinkpb.ColumnAs{Field: "columna"}}}}}, &flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Dest, Id: "xx1", Upstream: "xx0", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Dest: &flinkpb.DestOperator{TableId: "sot-000000hbase_dest", Columns: []string{"rowkey", "columna"}}}}}}}
+	pg_source_dest = request.JobInfo{JobId: "job-00pg_source_dest", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Operator, Operators: []*flinkpb.FlinkOperator{&flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Source, Id: "xx0", DownStream: "xx1", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Source: &flinkpb.SourceOperator{TableId: "sot-0postgres_source", Column: []*flinkpb.ColumnAs{&flinkpb.ColumnAs{Field: "id"}, &flinkpb.ColumnAs{Field: "id1"}}}}}, &flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Dest, Id: "xx1", Upstream: "xx0", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Dest: &flinkpb.DestOperator{TableId: "sot-000postgres_dest", Columns: []string{"id", "id1"}}}}}}}
+	ck_source_dest = request.JobInfo{JobId: "job-00ck_source_dest", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Operator, Operators: []*flinkpb.FlinkOperator{&flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Source, Id: "xx0", DownStream: "xx1", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Source: &flinkpb.SourceOperator{TableId: "sot-clickhousesource", Column: []*flinkpb.ColumnAs{&flinkpb.ColumnAs{Field: "id"}, &flinkpb.ColumnAs{Field: "id1"}}}}}, &flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Dest, Id: "xx1", Upstream: "xx0", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Dest: &flinkpb.DestOperator{TableId: "sot-0clickhouse_dest", Columns: []string{"id", "id1"}}}}}}}
 
 	//mw = jobpb.RunJobRequest{ID: CreateRandomString(20), SpaceID: spaceID45, EngineID: CreateRandomString(20), EngineType: constants.EngineTypeFlink, JobInfo: `{"stream_sql":true,"env":{"engine_id":"","parallelism":2,"job_mem":0,"job_cpu":0,"task_cpu":0,"task_mem":0,"task_num":0,"custom":null},"nodes":[{"nodetype":"Source","nodeid":"xx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012346","table":"billing as k","distinct":"ALL","column":[{"field":"k.paycount * r.rate","as":"stotal"}]}},{"nodetype":"Source","nodeid":"rxx0","upstream":"","upstreamright":"","downstream":"xx1","pointx":"","pointy":"","property":{"id":"sot-0123456789012355","table":"mw FOR SYSTEM_TIME AS OF k.tproctime AS r","distinct":"ALL","column":null}},{"nodetype":"Join","nodeid":"xx1","upstream":"xx0","upstreamright":"rxx0","downstream":"xx2","pointx":"","pointy":"","property":{"join":"JOIN","expression":"r.dbmoney = k.paymoney","column":[{"field":"stotal","as":""}]}},{"nodetype":"Dest","nodeid":"xx2","upstream":"xx1","upstreamright":"","downstream":"","pointx":"","pointy":"","property":{"table":"mwd","column":["total"],"id":"sot-0123456789012356"}}]}`}
 	////{"paycount": 2, "paymoney": "EUR"} {"paycount": 1, "paymoney": "USD"}
@@ -141,15 +151,51 @@ func Test_Run(t *testing.T) {
 	//require.Nil(t, err, "%+v", err)
 	//_, err = client.Run(ctx, &msmd)
 	//require.Nil(t, err, "%+v", err)
-	_, err = client.Run(ctx, &python_print)
-	require.Nil(t, err, "%+v", err)
-	_, err = client.Run(ctx, &scala_print)
+	//_, err = client.Run(ctx, &python_print)
+	//require.Nil(t, err, "%+v", err)
+	//_, err = client.Run(ctx, &scala_print)
+	//require.Nil(t, err, "%+v", err)
+	//_, err = client.Run(ctx, &kafka_source_dest)
+	//require.Nil(t, err, "%+v", err)
+	//_, err = client.Run(ctx, &hdfs_source_dest)
+	//require.Nil(t, err, "%+v", err)
+	//_, err = client.Run(ctx, &s3_source_dest)
+	//require.Nil(t, err, "%+v", err)
+	//_, err = client.Run(ctx, &hbase_source_dest)
+	//require.Nil(t, err, "%+v", err)
+	//_, err = client.Run(ctx, &pg_source_dest)
+	//require.Nil(t, err, "%+v", err)
+	_, err = client.Run(ctx, &ck_source_dest)
 	require.Nil(t, err, "%+v", err)
 }
 
 func Test_GetState(t *testing.T) {
 	mainInit(t, false)
 	var err error
+
+	req := request.JobGetState{JobId: ck_source_dest.JobId}
+	_, err = client.GetState(ctx, &req)
+	require.Nil(t, err, "%+v", err)
+
+	//req := request.JobGetState{JobId: pg_source_dest.JobId}
+	//_, err = client.GetState(ctx, &req)
+	//require.Nil(t, err, "%+v", err)
+
+	//req := request.JobGetState{JobId: hbase_source_dest.JobId}
+	//_, err = client.GetState(ctx, &req)
+	//require.Nil(t, err, "%+v", err)
+
+	//req := request.JobGetState{JobId: s3_source_dest.JobId}
+	//_, err = client.GetState(ctx, &req)
+	//require.Nil(t, err, "%+v", err)
+
+	//req := request.JobGetState{JobId: hdfs_source_dest.JobId}
+	//_, err = client.GetState(ctx, &req)
+	//require.Nil(t, err, "%+v", err)
+
+	//req := request.JobGetState{JobId: kafka_source_dest.JobId}
+	//_, err = client.GetState(ctx, &req)
+	//require.Nil(t, err, "%+v", err)
 
 	//req := request.JobGetState{JobId: msmd.JobId}
 	//_, err = client.GetState(ctx, &req)
@@ -160,13 +206,13 @@ func Test_GetState(t *testing.T) {
 	//require.Nil(t, err, "%+v", err)
 	//require.Equal(t, "success", "failed")
 
-	req := request.JobGetState{JobId: python_print.JobId}
-	_, err = client.GetState(ctx, &req)
-	require.Nil(t, err, "%+v", err)
+	//req := request.JobGetState{JobId: python_print.JobId}
+	//_, err = client.GetState(ctx, &req)
+	//require.Nil(t, err, "%+v", err)
 
-	req = request.JobGetState{JobId: scala_print.JobId}
-	_, err = client.GetState(ctx, &req)
-	require.Nil(t, err, "%+v", err)
+	//req = request.JobGetState{JobId: scala_print.JobId}
+	//_, err = client.GetState(ctx, &req)
+	//require.Nil(t, err, "%+v", err)
 }
 
 func Test_OperatorRelations(t *testing.T) {
@@ -197,21 +243,17 @@ func Test_Syntax(t *testing.T) {
 	require.Nil(t, err, "%+v", err)
 }
 
-//func Test_CancelJob(t *testing.T) {
-//	var req jobpb.CancelJobRequest
-//	var err error
-//
-//	mainInit(t, false)
-//
-//	_, err = client.Run(ctx, &mspdcancel)
-//	require.Nil(t, err, "%+v", err)
-//
-//	req.ID = mspdcancel.ID
-//
-//	_, err = client.CancelJob(ctx, &req)
-//	require.Nil(t, err, "%+v", err)
-//}
-//
+func Test_CancelJob(t *testing.T) {
+	var req request.JobCancel
+	var err error
+
+	mainInit(t, false)
+
+	req.JobId = kafka_source_dest.JobId
+	_, err = client.CancelJob(ctx, &req)
+	require.Nil(t, err, "%+v", err)
+}
+
 //func Test_CancelAllJob(t *testing.T) {
 //	var req jobpb.CancelAllJobRequest
 //	var err error
