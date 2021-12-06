@@ -19,7 +19,6 @@ import (
 	"github.com/DataWorkbench/gproto/pkg/model"
 	"github.com/DataWorkbench/gproto/pkg/request"
 	"github.com/DataWorkbench/gproto/pkg/response"
-	"github.com/DataWorkbench/gproto/pkg/zepspb"
 
 	"gorm.io/gorm"
 )
@@ -33,36 +32,27 @@ func NewJobWatcherClient(conn *grpcwrap.ClientConn) (c JobWatcherClient, err err
 	return c, nil
 }
 
-type ZeppelinScaleClient struct {
-	client zepspb.ZeppelinScaleClient
-}
-
-func NewZeppelinScaleClient(conn *grpcwrap.ClientConn) (c ZeppelinScaleClient, err error) {
-	c.client = zepspb.NewZeppelinScaleClient(conn)
-	return c, nil
-}
-
 type JobmanagerExecutor struct {
-	db                  *gorm.DB
-	idGenerator         *idgenerator.IDGenerator
-	jobDevClient        functions.JobdevClient
-	engineClient        EngineClient
-	jobWatcherClient    JobWatcherClient
-	zeppelinScaleClient ZeppelinScaleClient
-	ctx                 context.Context
-	logger              *glog.Logger
+	db               *gorm.DB
+	idGenerator      *idgenerator.IDGenerator
+	jobDevClient     functions.JobdevClient
+	engineClient     EngineClient
+	jobWatcherClient JobWatcherClient
+	ctx              context.Context
+	logger           *glog.Logger
+	zeppelin_address string
 }
 
-func NewJobManagerExecutor(db *gorm.DB, eClient EngineClient, job_client functions.JobdevClient, ictx context.Context, logger *glog.Logger, watcher_client JobWatcherClient, zeppelinscale_client ZeppelinScaleClient) *JobmanagerExecutor {
+func NewJobManagerExecutor(db *gorm.DB, eClient EngineClient, job_client functions.JobdevClient, ictx context.Context, logger *glog.Logger, watcher_client JobWatcherClient, zeppelin_address string) *JobmanagerExecutor {
 	ex := &JobmanagerExecutor{
-		db:                  db,
-		idGenerator:         idgenerator.New(constants.JobIDPrefix),
-		jobDevClient:        job_client,
-		ctx:                 ictx,
-		logger:              logger,
-		jobWatcherClient:    watcher_client,
-		zeppelinScaleClient: zeppelinscale_client,
-		engineClient:        eClient,
+		db:               db,
+		idGenerator:      idgenerator.New(constants.JobIDPrefix),
+		jobDevClient:     job_client,
+		ctx:              ictx,
+		logger:           logger,
+		jobWatcherClient: watcher_client,
+		engineClient:     eClient,
+		zeppelin_address: zeppelin_address,
 	}
 
 	return ex
@@ -83,12 +73,11 @@ func CreateRandomString(len int) string {
 
 func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobInfo, cmd string) (jobState response.JobState, err error) {
 	var (
-		zeppelinAddress *response.ZeppelinAddress
-		zeppelinClient  functions.HttpClient
-		jobParserResp   *response.JobParser
-		Pa              constants.FlinkParagraphsInfo
-		noteID          string
-		PaID            string
+		zeppelinClient functions.HttpClient
+		jobParserResp  *response.JobParser
+		Pa             constants.FlinkParagraphsInfo
+		noteID         string
+		PaID           string
 	)
 
 	defer func() {
@@ -114,11 +103,8 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 		}
 	}()
 
-	zeppelinAddress, err = ex.zeppelinScaleClient.client.GetZeppelinAddress(ctx, &model.EmptyStruct{})
-	if err != nil {
-		return
-	}
-	zeppelinClient = functions.NewHttpClient(zeppelinAddress.ServerAddress)
+	zeppelinAddress := ex.zeppelin_address
+	zeppelinClient = functions.NewHttpClient(zeppelinAddress)
 
 	jobParserResp, err = ex.jobDevClient.Client.JobParser(ctx, &request.JobParser{Job: jobInfo, Command: cmd})
 	if err != nil {
@@ -245,7 +231,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 			info.Message = constants.MessageRunning
 			info.Created = time.Now().Unix()
 			info.Updated = info.Created
-			info.ZeppelinServer = zeppelinAddress.ServerAddress
+			info.ZeppelinServer = zeppelinAddress
 			PaByte, _ := json.Marshal(Pa)
 			info.Paragraph = string(PaByte)
 			if jobParserResp.Resources != nil {

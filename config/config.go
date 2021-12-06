@@ -25,7 +25,7 @@ const (
 // Config is the configuration settings for spacemanager
 type Config struct {
 	LogLevel            int8                   `json:"log_level"      yaml:"log_level"      env:"LOG_LEVEL" validate:"gte=1,lte=5"`
-	ZeppelinScaleServer *grpcwrap.ClientConfig `json:"zeppelin_scale_server"      yaml:"zeppelin_scale_server"      env:"ZEPPELIN_SCALE_SERVER" validate:"required"`
+	ZeppelinAddress     string                 `json:"zeppelin_address"      yaml:"zeppelin_address"      env:"ZEPPELIN_ADDRESS" validate:"required"`
 	JobDeveloperServer  *grpcwrap.ClientConfig `json:"jobdeveloper_server"      yaml:"jobdeveloper_server"      env:"JOBDEVELOPER_SERVER" validate:"required"`
 	EngineManagerServer *grpcwrap.ClientConfig `json:"enginemanager_server"      yaml:"enginemanager_server"      env:"ENGINEMANAGER_SERVER" validate:"required"`
 	JobWatcherServer    *grpcwrap.ClientConfig `json:"jobwatcher_server"      yaml:"jobwatcher_server"      env:"JOBWATCHER_SERVER" validate:"required"`

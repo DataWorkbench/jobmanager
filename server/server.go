@@ -42,19 +42,17 @@ func Start() (err error) {
 	ctx := glog.WithContext(context.Background(), lp)
 
 	var (
-		db                  *gorm.DB
-		rpcServer           *grpcwrap.Server
-		metricServer        *metrics.Server
-		tracer              gtrace.Tracer
-		tracerCloser        io.Closer
-		jobdevConn          *grpcwrap.ClientConn
-		jobdevClient        functions.JobdevClient
-		engineConn          *grpcwrap.ClientConn
-		engineClient        executor.EngineClient
-		jobWatcherConn      *grpcwrap.ClientConn
-		jobWatcherClient    executor.JobWatcherClient
-		zeppelinScaleConn   *grpcwrap.ClientConn
-		zeppelinScaleClient executor.ZeppelinScaleClient
+		db               *gorm.DB
+		rpcServer        *grpcwrap.Server
+		metricServer     *metrics.Server
+		tracer           gtrace.Tracer
+		tracerCloser     io.Closer
+		jobdevConn       *grpcwrap.ClientConn
+		jobdevClient     functions.JobdevClient
+		engineConn       *grpcwrap.ClientConn
+		engineClient     executor.EngineClient
+		jobWatcherConn   *grpcwrap.ClientConn
+		jobWatcherClient executor.JobWatcherClient
 	)
 
 	defer func() {
@@ -113,18 +111,8 @@ func Start() (err error) {
 		return
 	}
 
-	zeppelinScaleConn, err = grpcwrap.NewConn(ctx, cfg.ZeppelinScaleServer, grpcwrap.ClientWithTracer(tracer))
-	if err != nil {
-		return
-	}
-
-	zeppelinScaleClient, err = executor.NewZeppelinScaleClient(zeppelinScaleConn)
-	if err != nil {
-		return
-	}
-
 	rpcServer.Register(func(s *grpc.Server) {
-		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(executor.NewJobManagerExecutor(db, engineClient, jobdevClient, ctx, lp, jobWatcherClient, zeppelinScaleClient)))
+		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(executor.NewJobManagerExecutor(db, engineClient, jobdevClient, ctx, lp, jobWatcherClient, cfg.ZeppelinAddress)))
 	})
 
 	// handle signal
