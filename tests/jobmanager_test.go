@@ -92,7 +92,7 @@ func mainInit(t *testing.T, manualInit bool) {
 	}
 	spaceid = "wks-0000000000000001"
 
-	sql_msmd = request.JobInfo{JobId: "job-0000000000000sql", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_SQL, Sql: &flinkpb.FlinkSQL{Code: "drop table if exists md;\ncreate table md\n(id bigint,id1 bigint) WITH (\n'connector' = 'jdbc',\n'url' = 'jdbc:mysql://dataworkbench-db:3306/data_workbench',\n'table-name' = 'md',\n'username' = 'root',\n'password' = 'password'\n);\n\n\ndrop table if exists ms;\ncreate table ms\n(id bigint,id1 bigint) WITH (\n'connector' = 'jdbc',\n'url' = 'jdbc:mysql://dataworkbench-db:3306/data_workbench',\n'table-name' = 'ms',\n'username' = 'root',\n'password' = 'password'\n);\n\n\ninsert into md(id,id1) select ALL id as id,id1 from ms \n"}}}
+	sql_msmd = request.JobInfo{JobId: "job-0000000000000sql", SpaceId: spaceid, Args: &model.StreamJobArgs{ClusterId: "eng-0000000000000000"}, Code: &model.StreamJobCode{Type: model.StreamJob_SQL, Sql: &flinkpb.FlinkSQL{Code: "drop table if exists md;\ncreate table md\n(id bigint,id1 bigint) WITH (\n'connector' = 'jdbc',\n'url' = 'jdbc:mysql://dataworkbench-db:3306/data_workbench',\n'table-name' = 'md',\n'username' = 'root',\n'password' = 'password'\n);\n\n\ndrop table if exists ms;\ncreate table ms\n(id bigint,id1 bigint) WITH (\n'connector' = 'jdbc',\n'url' = 'jdbc:mysql://dataworkbench-db:3306/data_workbench',\n'table-name' = 'ms',\n'username' = 'root',\n'password' = 'password'\n);\n\n\ninsert into md(id,id1) select ALL id as id,id1 from ms \n"}}}
 	//msmd = request.JobInfo{JobId: "job-00000source_dest", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Operator, Operators: []*flinkpb.FlinkOperator{&flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Source, Id: "xx0", DownStream: "xx1", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Source: &flinkpb.SourceOperator{TableId: "sot-00000mysqlsource", Column: []*flinkpb.ColumnAs{&flinkpb.ColumnAs{Field: "id"}, &flinkpb.ColumnAs{Field: "id1"}}}}}, &flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Dest, Id: "xx1", Upstream: "xx0", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Dest: &flinkpb.DestOperator{TableId: "sot-0000000mysqldest", Columns: []string{"id", "id1"}}}}}}}
 	msmd = request.JobInfo{JobId: "job-00000source_dest", SpaceId: spaceid, Args: &model.StreamJobArgs{Function: &model.StreamJobArgs_Function{UdfIds: []string{"udf-0000scalaplusone"}}}, Code: &model.StreamJobCode{Type: model.StreamJob_Operator, Operators: []*flinkpb.FlinkOperator{&flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Source, Id: "xx0", DownStream: "xx1", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Source: &flinkpb.SourceOperator{TableId: "sot-00000mysqlsource", Column: []*flinkpb.ColumnAs{&flinkpb.ColumnAs{Field: "plus_one(id)"}, &flinkpb.ColumnAs{Field: "id1"}}}}}, &flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Dest, Id: "xx1", Upstream: "xx0", PointX: 1, PointY: 1, Property: &flinkpb.OperatorProperty{Dest: &flinkpb.DestOperator{TableId: "sot-0000000mysqldest", Columns: []string{"id", "id1"}}}}}}}
 	preview_ms = request.JobInfo{JobId: "job-00000source_dest", SpaceId: spaceid, Code: &model.StreamJobCode{Type: model.StreamJob_Operator, Operators: []*flinkpb.FlinkOperator{&flinkpb.FlinkOperator{Type: flinkpb.FlinkOperator_Source, Id: "xx0", Property: &flinkpb.OperatorProperty{Source: &flinkpb.SourceOperator{TableId: "sot-00000mysqlsource", Column: []*flinkpb.ColumnAs{&flinkpb.ColumnAs{Field: "id"}, &flinkpb.ColumnAs{Field: "id1"}}}}}}}}
@@ -238,9 +238,9 @@ func Test_Preview(t *testing.T) {
 func Test_Syntax(t *testing.T) {
 	mainInit(t, false)
 
-	_, err := client.Syntax(ctx, &msmd)
-	require.Nil(t, err, "%+v", err)
-	_, err = client.Syntax(ctx, &sql_msmd)
+	//_, err := client.Syntax(ctx, &msmd)
+	//require.Nil(t, err, "%+v", err)
+	_, err := client.Syntax(ctx, &sql_msmd)
 	require.Nil(t, err, "%+v", err)
 }
 

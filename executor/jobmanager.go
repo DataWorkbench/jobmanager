@@ -165,47 +165,30 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 			return
 		}
 
-		if err = zeppelinClient.RunParagraphSync(noteID, Pa.Conf); err != nil {
-			PaID = Pa.Conf
-			return
-		}
-
-		if Pa.Depends != "" {
-			if err = zeppelinClient.RunParagraphSync(noteID, Pa.Depends); err != nil {
-				PaID = Pa.Depends
-				return
-			}
-		}
-
-		if Pa.ScalaUDF != "" {
-			if err = zeppelinClient.RunParagraphSync(noteID, Pa.ScalaUDF); err != nil {
-				PaID = Pa.ScalaUDF
-				return
-			}
-		}
-
-		if Pa.PythonUDF != "" {
-			if err = zeppelinClient.RunParagraphSync(noteID, Pa.PythonUDF); err != nil {
-				PaID = Pa.PythonUDF
-				return
-			}
-		}
-
 		if cmd == constants.JobCommandSyntax {
-			if err = zeppelinClient.RunParagraphSync(noteID, Pa.MainRun); err != nil {
-				var output string
+			var output string
+			var outputJson []map[string]string
 
-				if output, err = zeppelinClient.GetParagraphResultOutput(noteID, Pa.MainRun); err != nil {
-					PaID = Pa.MainRun
-					return
-				}
-				result := output[strings.Index(output, "org.apache.flink.table.api."):strings.Index(output, "at org.apache.flink.table.")]
-				jobState.Message = result[strings.Index(result, ":")+1:]
-				jobState.State = model.StreamJobInst_Failed
+			if err = zeppelinClient.RunParagraphSync(noteID, Pa.MainRun); err != nil {
+				ex.logger.Error().Msg("can't check syntax").String("sql", jobParserResp.ZeppelinMainRun).Any("", err).Fire()
 				err = nil
-			} else {
+			}
+
+			if output, err = zeppelinClient.GetParagraphResultOutput(noteID, Pa.MainRun); err != nil {
+				PaID = Pa.MainRun
+				return
+			}
+
+			if err = json.Unmarshal([]byte(output), &outputJson); err != nil {
+				ex.logger.Error().Msg("can't check syntax").String("sql", jobParserResp.ZeppelinMainRun).Any("can't Unmarshal output", err).Fire()
+				err = nil
+			}
+
+			if outputJson[0]["data"][0] == '0' {
 				jobState.State = model.StreamJobInst_Succeed
-				jobState.Message = constants.MessageFinish
+			} else {
+				jobState.State = model.StreamJobInst_Failed
+				jobState.Message = outputJson[0]["data"]
 			}
 
 			if err = zeppelinClient.DeleteNote(noteID); err != nil {
@@ -220,6 +203,33 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 				info functions.JobmanagerInfo
 				//watchInfoRequest jobwpb.WatchJobRequest
 			)
+
+			if err = zeppelinClient.RunParagraphSync(noteID, Pa.Conf); err != nil {
+				PaID = Pa.Conf
+				return
+			}
+
+			if Pa.Depends != "" {
+				if err = zeppelinClient.RunParagraphSync(noteID, Pa.Depends); err != nil {
+					PaID = Pa.Depends
+					return
+				}
+			}
+
+			if Pa.ScalaUDF != "" {
+				if err = zeppelinClient.RunParagraphSync(noteID, Pa.ScalaUDF); err != nil {
+					PaID = Pa.ScalaUDF
+					return
+				}
+			}
+
+			if Pa.PythonUDF != "" {
+				if err = zeppelinClient.RunParagraphSync(noteID, Pa.PythonUDF); err != nil {
+					PaID = Pa.PythonUDF
+					return
+				}
+			}
+
 			if err = zeppelinClient.RunParagraphAsync(noteID, Pa.MainRun); err != nil {
 				PaID = Pa.MainRun
 				return
