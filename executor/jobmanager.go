@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"gorm.io/gorm/clause"
 	"math/big"
 	"strings"
 	"time"
@@ -257,11 +258,11 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 			//	return
 			//}
 
-			db := ex.db.WithContext(ctx)
-			err = db.Create(info).Error
-			if err != nil {
-				return
-			}
+			ex.db.WithContext(ctx).Clauses(clause.OnConflict{UpdateAll: true}).Create(&info)
+			//err = db.Create(info).Error
+			//if err != nil {
+			//	return
+			//}
 
 			jobState.State = model.StreamJobInst_Running
 			jobState.Message = constants.MessageRunning
