@@ -128,6 +128,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 			noteName = "syx-" + CreateRandomString(16)
 		}
 		noteID, err = zeppelinClient.CreateNote(noteName)
+		ex.logger.Info().Msg("note id is " + noteID)
 		if err != nil {
 			return
 		}
@@ -186,8 +187,9 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 				err = nil
 			}
 
-			if outputJson[0]["data"][0] == '0' || jobInfo.Code.Type > 2 {
+			if jobInfo.Code.Type > 2 || outputJson[0]["data"][0] == '0' {
 				jobState.State = model.StreamJobInst_Succeed
+				jobState.Message = "job is running"
 			} else {
 				jobState.State = model.StreamJobInst_Failed
 				jobState.Message = outputJson[0]["data"]
