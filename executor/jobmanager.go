@@ -261,11 +261,15 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 			//	return
 			//}
 
-			ex.db.WithContext(ctx).Clauses(clause.OnConflict{UpdateAll: true}).Create(&info)
-			//err = db.Create(info).Error
-			//if err != nil {
+			//if err = ex.db.WithContext(ctx).Clauses(clause.OnConflict{UpdateAll: true}).Create(&info).Error;err!=nil{
 			//	return
 			//}
+			if err = ex.db.WithContext(ctx).Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "job_id"}},
+				UpdateAll: true,
+			}).Create(&info).Error; err != nil {
+				return
+			}
 
 			jobState.State = model.StreamJobInst_Running
 			jobState.Message = constants.MessageRunning
