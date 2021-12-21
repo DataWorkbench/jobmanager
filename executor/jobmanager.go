@@ -166,6 +166,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 			return
 		}
 
+		//TODO 这里需要任务具体类型
 		if cmd == constants.JobCommandSyntax {
 			var output string
 			var outputJson []map[string]string
@@ -185,7 +186,7 @@ func (ex *JobmanagerExecutor) RunJob(ctx context.Context, jobInfo *request.JobIn
 				err = nil
 			}
 
-			if outputJson[0]["data"][0] == '0' {
+			if outputJson[0]["data"][0] == '0' || jobInfo.Code.Type > 2 {
 				jobState.State = model.StreamJobInst_Succeed
 			} else {
 				jobState.State = model.StreamJobInst_Failed
