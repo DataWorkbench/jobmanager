@@ -17,6 +17,10 @@ github.com/DataWorkbench/common v0.0.0-20211104133207-bbc0e4b0a78f h1:4DnHmCh4UW
 github.com/DataWorkbench/common v0.0.0-20211104133207-bbc0e4b0a78f/go.mod h1:gp5TWb6n22diKMkyDk7TJ4jF4S/TN941cAnehX54ySA=
 github.com/DataWorkbench/common v0.0.0-20211222053708-6d5b8b89127b h1:8yJAZxCqOJuyoOUGAtYcO0iSw4+2xrOw9WopFjxKqLc=
 github.com/DataWorkbench/common v0.0.0-20211222053708-6d5b8b89127b/go.mod h1:pHyBUTA0Bgmo4HUxn4ZBcXuuVouC9CF5Kz7acSQ44Ww=
+github.com/DataWorkbench/common v0.0.0-20211224061813-49d7fa65a28d h1:ej2cIIhV+3I/60z6a3/s6uc+pY6HuoV9dtDaQ3wzoT4=
+github.com/DataWorkbench/common v0.0.0-20211224061813-49d7fa65a28d/go.mod h1:pHyBUTA0Bgmo4HUxn4ZBcXuuVouC9CF5Kz7acSQ44Ww=
+github.com/DataWorkbench/common v0.0.0-20211224062441-1882f0815818 h1:PBwudpocElAMEm1qQ9yg3idelYRMYhpM+UjG9Cj6h9o=
+github.com/DataWorkbench/common v0.0.0-20211224062441-1882f0815818/go.mod h1:pHyBUTA0Bgmo4HUxn4ZBcXuuVouC9CF5Kz7acSQ44Ww=
 github.com/DataWorkbench/glog v0.0.0-20210809050640-4960fd6de6ab h1:qQ6Nd6amyEXvslSxP+62TITT2fbPHKjt0rbyjzzfoP8=
 github.com/DataWorkbench/glog v0.0.0-20210809050640-4960fd6de6ab/go.mod h1:zymxJLXn162xdWYUqIb729S3ZzRQpdTj/LwnW+xxru4=
 github.com/DataWorkbench/gproto v0.0.0-20211104011919-3ac6e567ea90/go.mod h1:bdju+jQfnsfc2IGHllEcCR9Nm57FjIqu8I2IANyY49Q=
