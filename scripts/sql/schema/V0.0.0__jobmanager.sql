@@ -1,6 +1,3 @@
--- DATABASE
-CREATE DATABASE IF NOT EXISTS data_workbench;
-USE data_workbench;
 
 create table job_manager (
 	job_id varchar(24),
