@@ -12,16 +12,16 @@ import (
 	"github.com/DataWorkbench/jobmanager/utils"
 )
 
-type JobManagerServer struct {
+type JobManagerService struct {
 	ctx            context.Context
 	logger         *glog.Logger
 	zeppelinConfig zeppelin.ClientConfig
 	bm             *BaseManagerExecutor
 }
 
-func NewJobManagerServer(ctx context.Context, uClient utils.UdfClient, eClient utils.EngineClient,
-	rClient utils.ResourceClient, logger *glog.Logger, config zeppelin.ClientConfig) *JobManagerServer {
-	return &JobManagerServer{
+func NewJobManagerService(ctx context.Context, uClient utils.UdfClient, eClient utils.EngineClient,
+	rClient utils.ResourceClient, logger *glog.Logger, config zeppelin.ClientConfig) *JobManagerService {
+	return &JobManagerService{
 		ctx:            ctx,
 		logger:         logger,
 		zeppelinConfig: config,
@@ -29,7 +29,7 @@ func NewJobManagerServer(ctx context.Context, uClient utils.UdfClient, eClient u
 	}
 }
 
-func (jm *JobManagerServer) RunJob(ctx context.Context, jobInfo *request.JobInfo) (res *response.JobInfo, err error) {
+func (jm *JobManagerService) RunJob(ctx context.Context, jobInfo *request.JobInfo) (res *response.JobInfo, err error) {
 	var executor JobExecutor
 	switch jobInfo.Code.Type {
 	case model.StreamJob_SQL:
