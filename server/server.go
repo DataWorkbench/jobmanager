@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/DataWorkbench/jobmanager/utils"
 	"io"
 	"os"
 	"os/signal"
@@ -50,7 +51,7 @@ func Start() (err error) {
 		jobdevConn       *grpcwrap.ClientConn
 		jobdevClient     functions.JobdevClient
 		engineConn       *grpcwrap.ClientConn
-		engineClient     executor.EngineClient
+		engineClient     utils.EngineClient
 		jobWatcherConn   *grpcwrap.ClientConn
 		jobWatcherClient executor.JobWatcherClient
 	)
@@ -96,7 +97,7 @@ func Start() (err error) {
 		return
 	}
 
-	engineClient, err = executor.NewEngineClient(engineConn)
+	engineClient, err = utils.NewEngineClient(engineConn)
 	if err != nil {
 		return
 	}

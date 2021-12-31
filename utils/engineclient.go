@@ -1,4 +1,4 @@
-package executor
+package utils
 
 import (
 	"github.com/DataWorkbench/common/grpcwrap"
@@ -6,10 +6,10 @@ import (
 )
 
 type EngineClient struct {
-	client enginepb.EngineClient
+	Client enginepb.EngineClient
 }
 
 func NewEngineClient(conn *grpcwrap.ClientConn) (c EngineClient, err error) {
-	c.client = enginepb.NewEngineClient(conn)
+	c.Client = enginepb.NewEngineClient(conn)
 	return c, nil
 }
