@@ -3,6 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/grpcwrap"
 	"github.com/DataWorkbench/common/gtrace"
@@ -12,15 +18,9 @@ import (
 	"github.com/DataWorkbench/glog"
 	"github.com/DataWorkbench/gproto/pkg/jobpb"
 	"github.com/DataWorkbench/jobmanager/config"
-	"github.com/DataWorkbench/jobmanager/executor"
+	"github.com/DataWorkbench/jobmanager/service"
 	"github.com/DataWorkbench/jobmanager/utils"
 	"google.golang.org/grpc"
-	"io"
-	"os/signal"
-	"syscall"
-
-	"os"
-	"time"
 )
 
 func Start() (err error) {
@@ -101,7 +101,7 @@ func Start() (err error) {
 			RetryCount:    0,
 			QueryInterval: 0,
 		}
-		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(executor.NewJobManagerService(ctx, udfClient, engineClient, resourceClient,
+		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(service.NewJobManagerService(ctx, udfClient, engineClient, resourceClient,
 			lp, zeppelinConfig, flinkConfig)))
 	})
 

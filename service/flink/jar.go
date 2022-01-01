@@ -1,4 +1,4 @@
-package executor
+package flink
 
 import (
 	"context"
@@ -11,23 +11,21 @@ import (
 	"github.com/DataWorkbench/gproto/pkg/request"
 )
 
-type JarManagerExecutor struct {
-	bm             *BaseManagerExecutor
-	zeppelinConfig zeppelin.ClientConfig
-	ctx            context.Context
-	logger         *glog.Logger
+type JarExecutor struct {
+	bm     *BaseExecutor
+	ctx    context.Context
+	logger *glog.Logger
 }
 
-func NewJarManagerExecutor(bm *BaseManagerExecutor, zeppelinConfig zeppelin.ClientConfig, ctx context.Context, logger *glog.Logger) *JarManagerExecutor {
-	return &JarManagerExecutor{
-		bm:             bm,
-		zeppelinConfig: zeppelinConfig,
-		ctx:            ctx,
-		logger:         logger,
+func NewJarExecutor(bm *BaseExecutor, ctx context.Context, logger *glog.Logger) *JarExecutor {
+	return &JarExecutor{
+		bm:     bm,
+		ctx:    ctx,
+		logger: logger,
 	}
 }
 
-func (jarExec *JarManagerExecutor) Run(ctx context.Context, info *request.JobInfo) (*zeppelin.ExecuteResult, error) {
+func (jarExec *JarExecutor) Run(ctx context.Context, info *request.JobInfo) (*zeppelin.ExecuteResult, error) {
 	jar := info.GetCode().GetJar()
 	properties := map[string]string{}
 	properties["shell.command.timeout.millisecs"] = "30000"
@@ -53,7 +51,7 @@ func (jarExec *JarManagerExecutor) Run(ctx context.Context, info *request.JobInf
 	builder.WriteString(fmt.Sprintf(" %s %s", localJarPath, jar.GetJarArgs()))
 	code := builder.String()
 
-	session := zeppelin.NewZSessionWithProperties(jarExec.zeppelinConfig, SHELL, properties)
+	session := zeppelin.NewZSessionWithProperties(jarExec.bm.zeppelinConfig, SHELL, properties)
 	if err = session.Start(); err != nil {
 		return nil, err
 	}
@@ -65,10 +63,10 @@ func (jarExec *JarManagerExecutor) Run(ctx context.Context, info *request.JobInf
 	return result, nil
 }
 
-func (jarExec *JarManagerExecutor) GetInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
+func (jarExec *JarExecutor) GetInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
 	return jarExec.bm.GetJobInfo(ctx, jobId, jobName, spaceId, clusterId)
 }
 
-func (jarExec *JarManagerExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
+func (jarExec *JarExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
 	return jarExec.bm.CancelJob(ctx, jobId, spaceId, clusterId)
 }

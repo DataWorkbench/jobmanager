@@ -1,4 +1,4 @@
-package executor
+package flink
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/DataWorkbench/common/constants"
 	"github.com/DataWorkbench/common/flink"
+	"github.com/DataWorkbench/common/zeppelin"
 	"github.com/DataWorkbench/gproto/pkg/model"
 	"github.com/DataWorkbench/gproto/pkg/request"
 	"github.com/DataWorkbench/jobmanager/utils"
@@ -21,23 +22,26 @@ const (
 	SHELL = "sh"
 )
 
-type BaseManagerExecutor struct {
+type BaseExecutor struct {
 	engineClient   utils.EngineClient
 	udfClient      utils.UdfClient
 	resourceClient utils.ResourceClient
 	flinkClient    *flink.Client
+	zeppelinConfig zeppelin.ClientConfig
 }
 
-func NewBaseManager(engineClient utils.EngineClient, udfClient utils.UdfClient, resourceClient utils.ResourceClient, flinkConfig flink.ClientConfig) *BaseManagerExecutor {
-	return &BaseManagerExecutor{
+func NewBaseManager(engineClient utils.EngineClient, udfClient utils.UdfClient, resourceClient utils.ResourceClient,
+	flinkConfig flink.ClientConfig, zeppelinConfig zeppelin.ClientConfig) *BaseExecutor {
+	return &BaseExecutor{
 		engineClient:   engineClient,
 		udfClient:      udfClient,
 		resourceClient: resourceClient,
 		flinkClient:    flink.NewFlinkClient(flinkConfig),
+		zeppelinConfig: zeppelinConfig,
 	}
 }
 
-func (bm *BaseManagerExecutor) getEngineInfo(ctx context.Context, spaceId string, clusterId string) (url string, version string, err error) {
+func (bm *BaseExecutor) getEngineInfo(ctx context.Context, spaceId string, clusterId string) (url string, version string, err error) {
 	api, err := bm.engineClient.Client.DescribeFlinkClusterAPI(ctx, &request.DescribeFlinkClusterAPI{
 		SpaceId:   spaceId,
 		ClusterId: clusterId,
@@ -50,7 +54,7 @@ func (bm *BaseManagerExecutor) getEngineInfo(ctx context.Context, spaceId string
 	return
 }
 
-func (bm *BaseManagerExecutor) getConnectors(builtInConnectors []string, flinkVersion string) string {
+func (bm *BaseExecutor) getConnectors(builtInConnectors []string, flinkVersion string) string {
 	var executeJars string
 	var connectorSet map[string]string
 	connectorJarMap := constants.FlinkConnectorJarMap[flinkVersion]
@@ -74,7 +78,7 @@ type Udf struct {
 	code    string
 }
 
-func (bm *BaseManagerExecutor) getUDFs(ctx context.Context, udfIds []string) ([]*Udf, error) {
+func (bm *BaseExecutor) getUDFs(ctx context.Context, udfIds []string) ([]*Udf, error) {
 	var udfCodes []*Udf
 	for _, udfId := range udfIds {
 		var (
@@ -99,7 +103,7 @@ func (bm *BaseManagerExecutor) getUDFs(ctx context.Context, udfIds []string) ([]
 	return udfCodes, nil
 }
 
-func (bm *BaseManagerExecutor) getUDFJars(udfs []*Udf) string {
+func (bm *BaseExecutor) getUDFJars(udfs []*Udf) string {
 	var executionUdfJars string
 	for _, udf := range udfs {
 		if udf.udfType == model.UDFInfo_Java {
@@ -112,7 +116,7 @@ func (bm *BaseManagerExecutor) getUDFJars(udfs []*Udf) string {
 	return executionUdfJars
 }
 
-func (bm *BaseManagerExecutor) getGlobalProperties(ctx context.Context, info *request.JobInfo, udfs []*Udf) (map[string]string, error) {
+func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.JobInfo, udfs []*Udf) (map[string]string, error) {
 	properties := map[string]string{}
 	properties["FLINK_HOME"] = "/Users/apple/develop/bigdata/flink-1.12.5"
 	/*spaceId := info.GetSpaceId()
@@ -131,7 +135,7 @@ func (bm *BaseManagerExecutor) getGlobalProperties(ctx context.Context, info *re
 	}*/
 
 	properties["flink.execution.mode"] = "remote"
-	properties["flink.execution.remote.host"] = "127.0.0.2"
+	properties["flink.execution.remote.host"] = "127.0.0.1"
 	properties["flink.execution.remote.port"] = "8081"
 
 	flinkVersion := "flink-1.12.3-scala_2.11"
@@ -146,7 +150,7 @@ func (bm *BaseManagerExecutor) getGlobalProperties(ctx context.Context, info *re
 	return properties, nil
 }
 
-func (bm *BaseManagerExecutor) GetJobInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
+func (bm *BaseExecutor) GetJobInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
 	//engineRes, err := bm.engineClient.Client.DescribeFlinkClusterAPI(ctx, &request.DescribeFlinkClusterAPI{
 	//	SpaceId:   spaceId,
 	//	ClusterId: clusterId,
@@ -159,7 +163,7 @@ func (bm *BaseManagerExecutor) GetJobInfo(ctx context.Context, jobId string, job
 	return bm.flinkClient.GetJobInfo(flinkUrl, jobId, jobName)
 }
 
-func (bm *BaseManagerExecutor) CancelJob(ctx context.Context, jobId string, spaceId string, clusterId string) error {
+func (bm *BaseExecutor) CancelJob(ctx context.Context, jobId string, spaceId string, clusterId string) error {
 	//engineRes, err := bm.engineClient.Client.DescribeFlinkClusterAPI(ctx, &request.DescribeFlinkClusterAPI{
 	//	SpaceId:   spaceId,
 	//	ClusterId: clusterId,

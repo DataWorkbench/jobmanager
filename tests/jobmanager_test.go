@@ -15,7 +15,7 @@ import (
 
 var client jobpb.JobmanagerClient
 var ctx context.Context
-var spaceId string = "wks-0123456789012345"
+var spaceId = "wks-0123456789012345"
 
 func init() {
 	address := "127.0.0.1:9105"

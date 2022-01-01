@@ -1,4 +1,4 @@
-package executor
+package flink
 
 import (
 	"context"
@@ -13,32 +13,30 @@ import (
 	"github.com/DataWorkbench/gproto/pkg/request"
 )
 
-type ScalaManagerExecutor struct {
-	bm             *BaseManagerExecutor
-	zeppelinConfig zeppelin.ClientConfig
-	ctx            context.Context
-	logger         *glog.Logger
+type SqlExecutor struct {
+	bm     *BaseExecutor
+	ctx    context.Context
+	logger *glog.Logger
 }
 
-func NewScalaManagerExecutor(bm *BaseManagerExecutor, zeppelinConfig zeppelin.ClientConfig, ctx context.Context, logger *glog.Logger) *ScalaManagerExecutor {
-	return &ScalaManagerExecutor{
-		bm:             bm,
-		zeppelinConfig: zeppelinConfig,
-		ctx:            ctx,
-		logger:         logger,
+func NewSqlExecutor(ctx context.Context, bm *BaseExecutor, logger *glog.Logger) *SqlExecutor {
+	return &SqlExecutor{
+		bm:     bm,
+		ctx:    ctx,
+		logger: logger,
 	}
 }
 
-func (scalaExec *ScalaManagerExecutor) Run(ctx context.Context, info *request.JobInfo) (*zeppelin.ExecuteResult, error) {
-	udfs, err := scalaExec.bm.getUDFs(ctx, info.GetArgs().GetUdfs())
+func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.JobInfo) (*zeppelin.ExecuteResult, error) {
+	udfs, err := sqlExec.bm.getUDFs(ctx, info.GetArgs().GetUdfs())
 	if err != nil {
 		return nil, err
 	}
-	properties, err := scalaExec.bm.getGlobalProperties(ctx, info, udfs)
+	properties, err := sqlExec.bm.getGlobalProperties(ctx, info, udfs)
 	if err != nil {
 		return nil, err
 	}
-	session := zeppelin.NewZSessionWithProperties(scalaExec.zeppelinConfig, FLINK, properties)
+	session := zeppelin.NewZSessionWithProperties(sqlExec.bm.zeppelinConfig, FLINK, properties)
 	if err = session.Start(); err != nil {
 		return nil, err
 	}
@@ -62,7 +60,11 @@ func (scalaExec *ScalaManagerExecutor) Run(ctx context.Context, info *request.Jo
 	if info.GetArgs().GetParallelism() > 0 {
 		jobProp["parallelism"] = strconv.FormatInt(int64(info.GetArgs().GetParallelism()), 10)
 	}
-	if result, err = session.SubmitWithProperties("", jobProp, info.GetCode().Scala.Code); err != nil {
+	if strings.Contains(strings.ToLower(info.GetCode().Sql.Code), "insert") {
+		jobProp["runAsOne"] = "true"
+	}
+	// TODO if execute with batch type ssql waitUntilFinished
+	if result, err = session.SubmitWithProperties("ssql", jobProp, info.GetCode().Sql.Code); err != nil {
 		return result, err
 	}
 	if result, err = session.WaitUntilRunning(result.StatementId); err != nil {
@@ -77,7 +79,7 @@ func (scalaExec *ScalaManagerExecutor) Run(ctx context.Context, info *request.Jo
 			var reason string
 			if len(result.Results) > 0 {
 				reason = result.Results[0].Data
-				scalaExec.logger.Warn().Msg(reason)
+				sqlExec.logger.Warn().Msg(reason)
 			}
 			return result, nil
 		}
@@ -96,10 +98,10 @@ func (scalaExec *ScalaManagerExecutor) Run(ctx context.Context, info *request.Jo
 	}
 }
 
-func (scalaExec *ScalaManagerExecutor) GetInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
-	return scalaExec.bm.GetJobInfo(ctx, jobId, jobName, spaceId, clusterId)
+func (sqlExec *SqlExecutor) GetInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
+	return sqlExec.bm.GetJobInfo(ctx, jobId, jobName, spaceId, clusterId)
 }
 
-func (scalaExec *ScalaManagerExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
-	return scalaExec.bm.CancelJob(ctx, jobId, spaceId, clusterId)
+func (sqlExec *SqlExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
+	return sqlExec.bm.CancelJob(ctx, jobId, spaceId, clusterId)
 }
