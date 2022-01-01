@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/DataWorkbench/common/constants"
+	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/qerror"
 	"github.com/DataWorkbench/gproto/pkg/model"
 	"github.com/DataWorkbench/gproto/pkg/request"
@@ -17,22 +18,23 @@ var (
 )
 
 type BaseManagerExecutor struct {
-	ctx            context.Context
 	engineClient   utils.EngineClient
 	udfClient      utils.UdfClient
 	resourceClient utils.ResourceClient
+	flinkClient    *flink.Client
 }
 
-func NewBaseManager(engineClient utils.EngineClient, udfClient utils.UdfClient, resourceClient utils.ResourceClient) *BaseManagerExecutor {
+func NewBaseManager(engineClient utils.EngineClient, udfClient utils.UdfClient, resourceClient utils.ResourceClient, flinkConfig flink.ClientConfig) *BaseManagerExecutor {
 	return &BaseManagerExecutor{
 		engineClient:   engineClient,
 		udfClient:      udfClient,
 		resourceClient: resourceClient,
+		flinkClient:    flink.NewFlinkClient(flinkConfig),
 	}
 }
 
-func (bm *BaseManagerExecutor) getEngineInfo(spaceId string, clusterId string) (url string, version string, err error) {
-	api, err := bm.engineClient.Client.DescribeFlinkClusterAPI(bm.ctx, &request.DescribeFlinkClusterAPI{
+func (bm *BaseManagerExecutor) getEngineInfo(ctx context.Context, spaceId string, clusterId string) (url string, version string, err error) {
+	api, err := bm.engineClient.Client.DescribeFlinkClusterAPI(ctx, &request.DescribeFlinkClusterAPI{
 		SpaceId:   spaceId,
 		ClusterId: clusterId,
 	})
@@ -68,7 +70,7 @@ type Udf struct {
 	code    string
 }
 
-func (bm *BaseManagerExecutor) getUDFs(udfIds []string) ([]*Udf, error) {
+func (bm *BaseManagerExecutor) getUDFs(ctx context.Context, udfIds []string) ([]*Udf, error) {
 	var udfCodes []*Udf
 	for _, udfId := range udfIds {
 		var (
@@ -76,7 +78,7 @@ func (bm *BaseManagerExecutor) getUDFs(udfIds []string) ([]*Udf, error) {
 			udfDefine   string
 			udfName     string
 		)
-		udfLanguage, udfName, udfDefine, err := bm.udfClient.DescribeUdfManager(bm.ctx, udfId)
+		udfLanguage, udfName, udfDefine, err := bm.udfClient.DescribeUdfManager(ctx, udfId)
 		if err != nil {
 			return nil, err
 		}
@@ -106,11 +108,11 @@ func (bm *BaseManagerExecutor) getUDFJars(udfs []*Udf) string {
 	return executionUdfJars
 }
 
-func (bm *BaseManagerExecutor) getGlobalProperties(info *request.JobInfo, udfs []*Udf) (map[string]string, error) {
+func (bm *BaseManagerExecutor) getGlobalProperties(ctx context.Context, info *request.JobInfo, udfs []*Udf) (map[string]string, error) {
 	spaceId := info.GetSpaceId()
 	clusterId := info.GetArgs().GetClusterId()
 	properties := map[string]string{}
-	flinkUrl, flinkVersion, err := bm.getEngineInfo(spaceId, clusterId)
+	flinkUrl, flinkVersion, err := bm.getEngineInfo(ctx, spaceId, clusterId)
 	if err != nil {
 		return nil, err
 	}
@@ -132,4 +134,28 @@ func (bm *BaseManagerExecutor) getGlobalProperties(info *request.JobInfo, udfs [
 		properties["flink.udf.jars"] = udfJars
 	}
 	return properties, nil
+}
+
+func (bm *BaseManagerExecutor) GetJobInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
+	engineRes, err := bm.engineClient.Client.DescribeFlinkClusterAPI(ctx, &request.DescribeFlinkClusterAPI{
+		SpaceId:   spaceId,
+		ClusterId: clusterId,
+	})
+	if err != nil {
+		return nil, err
+	}
+	flinkUrl := engineRes.GetURL()
+	return bm.flinkClient.GetJobInfo(flinkUrl, jobId, jobName)
+}
+
+func (bm *BaseManagerExecutor) CancelJob(ctx context.Context, jobId string, spaceId string, clusterId string) error {
+	engineRes, err := bm.engineClient.Client.DescribeFlinkClusterAPI(ctx, &request.DescribeFlinkClusterAPI{
+		SpaceId:   spaceId,
+		ClusterId: clusterId,
+	})
+	if err != nil {
+		return err
+	}
+	flinkUrl := engineRes.GetURL()
+	return bm.flinkClient.CancelJob(flinkUrl, jobId)
 }

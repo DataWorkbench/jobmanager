@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/zeppelin"
 	"github.com/DataWorkbench/glog"
 	"github.com/DataWorkbench/gproto/pkg/request"
@@ -31,7 +32,7 @@ func (jarExec *JarManagerExecutor) Run(ctx context.Context, info *request.JobInf
 	properties := map[string]string{}
 	properties["shell.command.timeout.millisecs"] = "30000"
 	properties["shell.working.directory.user.home"] = "/zeppelin/flink/flink-1.12.3/"
-	flinkUrl, _, err := jarExec.bm.getEngineInfo(info.GetSpaceId(), info.GetArgs().GetClusterId())
+	flinkUrl, _, err := jarExec.bm.getEngineInfo(ctx, info.GetSpaceId(), info.GetArgs().GetClusterId())
 	if err != nil {
 		return nil, err
 	}
@@ -62,4 +63,12 @@ func (jarExec *JarManagerExecutor) Run(ctx context.Context, info *request.JobInf
 	}
 
 	return result, nil
+}
+
+func (jarExec *JarManagerExecutor) GetInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
+	return jarExec.bm.GetJobInfo(ctx, jobId, jobName, spaceId, clusterId)
+}
+
+func (jarExec *JarManagerExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
+	return jarExec.bm.CancelJob(ctx, jobId, spaceId, clusterId)
 }

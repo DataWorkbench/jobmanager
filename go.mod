@@ -15,3 +15,8 @@ require (
 	gorm.io/driver/mysql v1.0.3
 	gorm.io/gorm v1.20.8
 )
+
+replace (
+	github.com/DataWorkbench/common v0.0.0-20211231092751-c71cfb6f3d3c => /Users/apple/develop/go/src/tmp/common
+	github.com/DataWorkbench/gproto v0.0.0-20211231143935-cc4425b8f334 => /Users/apple/develop/go/src/tmp/gproto
+)

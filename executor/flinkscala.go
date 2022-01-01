@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/qerror"
 	"github.com/DataWorkbench/common/zeppelin"
 	"github.com/DataWorkbench/glog"
@@ -30,11 +31,11 @@ func NewScalaManagerExecutor(bm *BaseManagerExecutor, zeppelinConfig zeppelin.Cl
 }
 
 func (scalaExec *ScalaManagerExecutor) Run(ctx context.Context, info *request.JobInfo) (*zeppelin.ExecuteResult, error) {
-	udfs, err := scalaExec.bm.getUDFs(info.GetArgs().GetUdfs())
+	udfs, err := scalaExec.bm.getUDFs(ctx, info.GetArgs().GetUdfs())
 	if err != nil {
 		return nil, err
 	}
-	properties, err := scalaExec.bm.getGlobalProperties(info, udfs)
+	properties, err := scalaExec.bm.getGlobalProperties(ctx, info, udfs)
 	if err != nil {
 		return nil, err
 	}
@@ -82,12 +83,21 @@ func (scalaExec *ScalaManagerExecutor) Run(ctx context.Context, info *request.Jo
 			return result, nil
 		}
 	}
-	for _, url := range result.JobUrls {
-		if url != "" && len(url) > 0 && strings.Index(url, "/") > 0 {
-			if jobId := url[strings.LastIndex(url, "/")+1:]; len(jobId) == 32 {
-				result.JobUrls = append(result.JobUrls, jobId)
-			}
+	if result.JobUrls != nil && len(result.JobUrls) > 0 &&
+		strings.LastIndex(result.JobUrls[0], "/") > 0 &&
+		strings.LastIndex(result.JobUrls[0], "/")+1 < len(result.JobUrls) {
+		if jobId := result.JobUrls[0][strings.LastIndex(result.JobUrls[0], "/")+1:]; len(jobId) == 32 {
+			result.JobUrls = append(result.JobUrls, jobId)
+			return result, nil
 		}
 	}
 	return result, nil
+}
+
+func (scalaExec *ScalaManagerExecutor) GetInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
+	return scalaExec.bm.GetJobInfo(ctx, jobId, jobName, spaceId, clusterId)
+}
+
+func (scalaExec *ScalaManagerExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
+	return scalaExec.bm.CancelJob(ctx, jobId, spaceId, clusterId)
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/qerror"
 	"github.com/DataWorkbench/common/zeppelin"
 	"github.com/DataWorkbench/glog"
@@ -30,11 +31,11 @@ func NewSqlManagerExecutor(bm *BaseManagerExecutor, zeppelinConfig zeppelin.Clie
 }
 
 func (sqlExec *SqlManagerExecutor) Run(ctx context.Context, info *request.JobInfo) (*zeppelin.ExecuteResult, error) {
-	udfs, err := sqlExec.bm.getUDFs(info.GetArgs().GetUdfs())
+	udfs, err := sqlExec.bm.getUDFs(ctx, info.GetArgs().GetUdfs())
 	if err != nil {
 		return nil, err
 	}
-	properties, err := sqlExec.bm.getGlobalProperties(info, udfs)
+	properties, err := sqlExec.bm.getGlobalProperties(ctx, info, udfs)
 	if err != nil {
 		return nil, err
 	}
@@ -82,16 +83,26 @@ func (sqlExec *SqlManagerExecutor) Run(ctx context.Context, info *request.JobInf
 			}
 			return nil, qerror.ZeppelinParagraphRunError.Format(reason)
 		}
-		if time.Now().Unix()-start >= 3000 {
+		if time.Now().Unix()-start >= 30000 {
 			return result, nil
 		}
 	}
-	for _, url := range result.JobUrls {
-		if url != "" && len(url) > 0 && strings.Index(url, "/") > 0 {
-			if jobId := url[strings.LastIndex(url, "/")+1:]; len(jobId) == 32 {
-				result.JobUrls = append(result.JobUrls, jobId)
-			}
+	if result.JobUrls != nil && len(result.JobUrls) > 0 &&
+		strings.LastIndex(result.JobUrls[0], "/") > 0 &&
+		strings.LastIndex(result.JobUrls[0], "/")+1 < len(result.JobUrls) {
+		if jobId := result.JobUrls[0][strings.LastIndex(result.JobUrls[0], "/")+1:]; len(jobId) == 32 {
+			result.JobUrls = append(result.JobUrls, jobId)
+			return result, nil
 		}
 	}
+
 	return result, nil
+}
+
+func (sqlExec *SqlManagerExecutor) GetInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
+	return sqlExec.bm.GetJobInfo(ctx, jobId, jobName, spaceId, clusterId)
+}
+
+func (sqlExec *SqlManagerExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
+	return sqlExec.bm.CancelJob(ctx, jobId, spaceId, clusterId)
 }
