@@ -2,18 +2,10 @@
 
 # 1=>"debug", 2=>"info", 3=>"warn", 4=>"error", 5=>"fatal"
 log_level: 1
-zeppelin_address: "zeppelin:8080"
+zeppelin_address: "http://127.0.0.1:8080"
 
-jobdeveloper_server:
-  address: "127.0.0.1:9109"  # required
-  log_level: 2 #  1 => info, 2 => waring, 3 => error, 4 => fatal
-  log_verbosity: 99
 enginemanager_server:
   address: "127.0.0.1:9114"  # required
-  log_level: 2 #  1 => info, 2 => waring, 3 => error, 4 => fatal
-  log_verbosity: 99
-jobwatcher_server:
-  address: "127.0.0.1:9108"  # required
   log_level: 2 #  1 => info, 2 => waring, 3 => error, 4 => fatal
   log_verbosity: 99
 udfmanager_server:
@@ -34,17 +26,6 @@ metrics_server:
   enabled: true
   address: "127.0.0.1:9205" # required when enabled is true
   url_path: "/metrics"
-
-mysql:
-  hosts: "127.0.0.1:3306"  # required
-  users: "root"  # required
-  password: "password"  # required
-  database: "data_workbench"  # required
-  max_idle_conn: 16
-  max_open_conn: 128
-  conn_max_lifetime: 10m
-  log_level: 4 # 1 => Silent, 2 => Error, 3 => Warn, 4 => Info
-  slow_threshold: 2s
 
 tracer:
   service_name: "jobmanager"

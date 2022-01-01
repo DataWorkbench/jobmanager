@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/DataWorkbench/common/flink"
-	"github.com/DataWorkbench/common/qerror"
 	"github.com/DataWorkbench/common/zeppelin"
 	"github.com/DataWorkbench/glog"
 	"github.com/DataWorkbench/gproto/pkg/model"
@@ -68,35 +67,37 @@ func (sqlExec *SqlManagerExecutor) Run(ctx context.Context, info *request.JobInf
 	}
 	// TODO if execute with batch type ssql waitUntilFinished
 	if result, err = session.SubmitWithProperties("ssql", jobProp, info.GetCode().Sql.Code); err != nil {
-		return nil, err
+		return result, err
 	}
 	if result, err = session.WaitUntilRunning(result.StatementId); err != nil {
-		return nil, err
+		return result, err
 	}
 	start := time.Now().Unix()
-	for len(result.JobUrls) == 0 {
-		result, err = session.QueryStatement(result.StatementId)
+	for {
+		if result, err = session.QueryStatement(result.StatementId); err != nil {
+			return result, err
+		}
 		if result.Status.IsFailed() {
 			var reason string
 			if len(result.Results) > 0 {
 				reason = result.Results[0].Data
+				sqlExec.logger.Warn().Msg(reason)
 			}
-			return nil, qerror.ZeppelinParagraphRunError.Format(reason)
+			return result, nil
+		}
+		if len(result.JobUrls) > 0 {
+			jobUrl := result.JobUrls[0]
+			if len(jobUrl)-1-strings.LastIndex(jobUrl, "/") == 32 {
+				jobId := jobUrl[strings.LastIndex(jobUrl, "/")+1:]
+				urls := []string{jobId}
+				result.JobUrls = urls
+			}
+			return result, nil
 		}
 		if time.Now().Unix()-start >= 30000 {
 			return result, nil
 		}
 	}
-	if result.JobUrls != nil && len(result.JobUrls) > 0 &&
-		strings.LastIndex(result.JobUrls[0], "/") > 0 &&
-		strings.LastIndex(result.JobUrls[0], "/")+1 < len(result.JobUrls) {
-		if jobId := result.JobUrls[0][strings.LastIndex(result.JobUrls[0], "/")+1:]; len(jobId) == 32 {
-			result.JobUrls = append(result.JobUrls, jobId)
-			return result, nil
-		}
-	}
-
-	return result, nil
 }
 
 func (sqlExec *SqlManagerExecutor) GetInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {

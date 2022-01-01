@@ -6,7 +6,6 @@ import (
 
 	"github.com/DataWorkbench/common/constants"
 	"github.com/DataWorkbench/common/flink"
-	"github.com/DataWorkbench/common/qerror"
 	"github.com/DataWorkbench/gproto/pkg/model"
 	"github.com/DataWorkbench/gproto/pkg/request"
 	"github.com/DataWorkbench/jobmanager/utils"
@@ -114,10 +113,10 @@ func (bm *BaseManagerExecutor) getUDFJars(udfs []*Udf) string {
 }
 
 func (bm *BaseManagerExecutor) getGlobalProperties(ctx context.Context, info *request.JobInfo, udfs []*Udf) (map[string]string, error) {
-	spaceId := info.GetSpaceId()
-	clusterId := info.GetArgs().GetClusterId()
 	properties := map[string]string{}
-	properties["FLINK_HOME"] = ""
+	properties["FLINK_HOME"] = "/Users/apple/develop/bigdata/flink-1.12.5"
+	/*spaceId := info.GetSpaceId()
+	clusterId := info.GetArgs().GetClusterId()
 	flinkUrl, flinkVersion, err := bm.getEngineInfo(ctx, spaceId, clusterId)
 	if err != nil {
 		return nil, err
@@ -129,8 +128,13 @@ func (bm *BaseManagerExecutor) getGlobalProperties(ctx context.Context, info *re
 		properties["flink.execution.remote.port"] = port
 	} else {
 		return nil, qerror.ParseEngineFlinkUrlFailed.Format(flinkUrl)
-	}
+	}*/
 
+	properties["flink.execution.mode"] = "remote"
+	properties["flink.execution.remote.host"] = "127.0.0.2"
+	properties["flink.execution.remote.port"] = "8081"
+
+	flinkVersion := "flink-1.12.3-scala_2.11"
 	executionJars := bm.getConnectors(info.GetArgs().GetBuiltInConnectors(), flinkVersion)
 	if executionJars != "" && len(executionJars) > 0 {
 		properties["flink.execution.jars"] = executionJars
@@ -143,25 +147,27 @@ func (bm *BaseManagerExecutor) getGlobalProperties(ctx context.Context, info *re
 }
 
 func (bm *BaseManagerExecutor) GetJobInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
-	engineRes, err := bm.engineClient.Client.DescribeFlinkClusterAPI(ctx, &request.DescribeFlinkClusterAPI{
-		SpaceId:   spaceId,
-		ClusterId: clusterId,
-	})
-	if err != nil {
-		return nil, err
-	}
-	flinkUrl := engineRes.GetURL()
+	//engineRes, err := bm.engineClient.Client.DescribeFlinkClusterAPI(ctx, &request.DescribeFlinkClusterAPI{
+	//	SpaceId:   spaceId,
+	//	ClusterId: clusterId,
+	//})
+	//if err != nil {
+	//	return nil, err
+	//}
+	//flinkUrl := engineRes.GetURL()
+	flinkUrl := "http://127.0.0.1:8081"
 	return bm.flinkClient.GetJobInfo(flinkUrl, jobId, jobName)
 }
 
 func (bm *BaseManagerExecutor) CancelJob(ctx context.Context, jobId string, spaceId string, clusterId string) error {
-	engineRes, err := bm.engineClient.Client.DescribeFlinkClusterAPI(ctx, &request.DescribeFlinkClusterAPI{
-		SpaceId:   spaceId,
-		ClusterId: clusterId,
-	})
-	if err != nil {
-		return err
-	}
-	flinkUrl := engineRes.GetURL()
+	//engineRes, err := bm.engineClient.Client.DescribeFlinkClusterAPI(ctx, &request.DescribeFlinkClusterAPI{
+	//	SpaceId:   spaceId,
+	//	ClusterId: clusterId,
+	//})
+	//if err != nil {
+	//	return err
+	//}
+	//flinkUrl := engineRes.GetURL()
+	flinkUrl := "http://127.0.0.1:8081"
 	return bm.flinkClient.CancelJob(flinkUrl, jobId)
 }

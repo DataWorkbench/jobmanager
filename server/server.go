@@ -92,12 +92,12 @@ func Start() (err error) {
 	rpcServer.Register(func(s *grpc.Server) {
 		zeppelinConfig := zeppelin.ClientConfig{
 			ZeppelinRestUrl: cfg.ZeppelinAddress,
-			Timeout:         5000,
+			Timeout:         15000 * time.Millisecond,
 			RetryCount:      0,
 			QueryInterval:   2000,
 		}
 		flinkConfig := flink.ClientConfig{
-			Timeout:       5000,
+			Timeout:       15000 * time.Millisecond,
 			RetryCount:    0,
 			QueryInterval: 0,
 		}
