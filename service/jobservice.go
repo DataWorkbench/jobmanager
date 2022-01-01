@@ -17,24 +17,23 @@ import (
 type JobManagerService struct {
 	ctx            context.Context
 	logger         *glog.Logger
-	zeppelinConfig zeppelin.ClientConfig
 	flinkExecutors map[model.StreamJob_Type]flinkService.Executor
 }
 
 func NewJobManagerService(ctx context.Context, uClient utils.UdfClient, eClient utils.EngineClient,
-	rClient utils.ResourceClient, logger *glog.Logger, zeppelinConfig zeppelin.ClientConfig, flinkConfig flink.ClientConfig) *JobManagerService {
-	jobManager := JobManagerService{}
-	jobManager.ctx = ctx
-	jobManager.logger = logger
-
-	jobManager.flinkExecutors = jobManager.createFlinkExecutor(ctx, flinkService.NewBaseManager(eClient, uClient, rClient, flinkConfig, zeppelinConfig), logger)
-
-	return &jobManager
+	rClient utils.ResourceClient, logger *glog.Logger, zeppelinConfig zeppelin.ClientConfig,
+	flinkConfig flink.ClientConfig) *JobManagerService {
+	return &JobManagerService{
+		ctx:    ctx,
+		logger: logger,
+		flinkExecutors: createFlinkExecutor(ctx, flinkService.
+			NewBaseManager(eClient, uClient, rClient, flinkConfig, zeppelinConfig), logger),
+	}
 }
 
 func (jm *JobManagerService) RunFlinkJob(ctx context.Context, jobInfo *request.JobInfo) (*response.JobInfo, error) {
 	res := response.JobInfo{}
-	executor := jm.getFlinkExecutor(jobInfo.Code.Type)
+	executor := jm.flinkExecutors[jobInfo.Code.Type]
 	result, err := executor.Run(ctx, jobInfo)
 	if err != nil {
 		return &res, err
@@ -62,7 +61,7 @@ func (jm *JobManagerService) RunFlinkJob(ctx context.Context, jobInfo *request.J
 		jm.logger.Warn().Msg(err.Error()).Fire()
 	} else if len(job.Jid) == 32 {
 		res.JobId = job.Jid
-		res.State = jm.transFlinkState(job.State)
+		res.State = transFlinkState(job.State)
 	} else if len(res.JobId) != 32 {
 		res.State = model.StreamJobInst_Timeout
 	}
@@ -70,24 +69,24 @@ func (jm *JobManagerService) RunFlinkJob(ctx context.Context, jobInfo *request.J
 }
 
 func (jm *JobManagerService) CancelFlinkJob(ctx context.Context, jobType model.StreamJob_Type, jobId string, spaceId string, clusterId string) error {
-	executor := jm.getFlinkExecutor(jobType)
+	executor := jm.flinkExecutors[jobType]
 	return executor.Cancel(ctx, jobId, spaceId, clusterId)
 }
 
 func (jm *JobManagerService) GetFlinkJob(ctx context.Context, jobType model.StreamJob_Type, jobId string,
 	jobName string, spaceId string, clusterId string) (*response.JobInfo, error) {
 	res := response.JobInfo{}
-	executor := jm.getFlinkExecutor(jobType)
+	executor := jm.flinkExecutors[jobType]
 	job, err := executor.GetInfo(ctx, jobId, jobName, spaceId, clusterId)
 	if err != nil {
 		return nil, err
 	}
-	res.State = jm.transFlinkState(job.State)
+	res.State = transFlinkState(job.State)
 	res.JobId = job.Jid
 	return &res, nil
 }
 
-func (jm *JobManagerService) createFlinkExecutor(ctx context.Context, bm *flinkService.BaseExecutor, logger *glog.Logger) map[model.StreamJob_Type]flinkService.Executor {
+func createFlinkExecutor(ctx context.Context, bm *flinkService.BaseExecutor, logger *glog.Logger) map[model.StreamJob_Type]flinkService.Executor {
 	executors := map[model.StreamJob_Type]flinkService.Executor{}
 	executors[model.StreamJob_SQL] = flinkService.NewExecutor(ctx, model.StreamJob_SQL, bm, logger)
 	executors[model.StreamJob_Jar] = flinkService.NewExecutor(ctx, model.StreamJob_Jar, bm, logger)
@@ -95,11 +94,7 @@ func (jm *JobManagerService) createFlinkExecutor(ctx context.Context, bm *flinkS
 	return executors
 }
 
-func (jm *JobManagerService) getFlinkExecutor(jobType model.StreamJob_Type) flinkService.Executor {
-	return jm.flinkExecutors[jobType]
-}
-
-func (jm *JobManagerService) transFlinkState(state string) model.StreamJobInst_State {
+func transFlinkState(state string) model.StreamJobInst_State {
 	const (
 		Cancelling   = "CANCELLING"
 		Reconciling  = "RECONCILING"
