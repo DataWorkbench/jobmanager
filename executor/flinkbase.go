@@ -17,6 +17,11 @@ var (
 	UDFQuote = Quote + "_udf_name_" + Quote
 )
 
+const (
+	FLINK = "flink"
+	SHELL = "sh"
+)
+
 type BaseManagerExecutor struct {
 	engineClient   utils.EngineClient
 	udfClient      utils.UdfClient
@@ -112,6 +117,7 @@ func (bm *BaseManagerExecutor) getGlobalProperties(ctx context.Context, info *re
 	spaceId := info.GetSpaceId()
 	clusterId := info.GetArgs().GetClusterId()
 	properties := map[string]string{}
+	properties["FLINK_HOME"] = ""
 	flinkUrl, flinkVersion, err := bm.getEngineInfo(ctx, spaceId, clusterId)
 	if err != nil {
 		return nil, err

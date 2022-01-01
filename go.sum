@@ -16,6 +16,8 @@ github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym
 github.com/DataDog/datadog-go v3.7.1+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/DataWorkbench/common v0.0.0-20211231092751-c71cfb6f3d3c h1:FqPHyHU85yXGK2Zi2emWAKFyJOWBUEl4SNjgiFn6AXk=
 github.com/DataWorkbench/common v0.0.0-20211231092751-c71cfb6f3d3c/go.mod h1:Yub6G+mxPzXmvbQE6DY8Ih2KIxZ+Vt0WUsI0vbEgU4A=
+github.com/DataWorkbench/common v0.0.0-20220101124902-b2a749288a1e h1:MMW8LaPWSLuZuk7qCLgqWOZCqXC8kwdyVz79H8u8ODQ=
+github.com/DataWorkbench/common v0.0.0-20220101124902-b2a749288a1e/go.mod h1:Yub6G+mxPzXmvbQE6DY8Ih2KIxZ+Vt0WUsI0vbEgU4A=
 github.com/DataWorkbench/glog v0.0.0-20210809050640-4960fd6de6ab h1:qQ6Nd6amyEXvslSxP+62TITT2fbPHKjt0rbyjzzfoP8=
 github.com/DataWorkbench/glog v0.0.0-20210809050640-4960fd6de6ab/go.mod h1:zymxJLXn162xdWYUqIb729S3ZzRQpdTj/LwnW+xxru4=
 github.com/DataWorkbench/gproto v0.0.0-20211104011919-3ac6e567ea90/go.mod h1:bdju+jQfnsfc2IGHllEcCR9Nm57FjIqu8I2IANyY49Q=
