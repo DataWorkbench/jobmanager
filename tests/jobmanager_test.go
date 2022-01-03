@@ -75,3 +75,17 @@ func Test_Validate(t *testing.T) {
 	require.Nil(t, err)
 	fmt.Println(res.Flag, res.Message)
 }
+
+func Test_GetInfo(t *testing.T) {
+	var flinkId = "8aa2bb960972ce7351745321bfc8dde7"
+	req := request.JobMessage{
+		JobId:     "syx-JHGYFjhKwUfaQDHZ",
+		FlinkId:   flinkId,
+		SpaceId:   spaceId,
+		ClusterId: "cfi-05636e792cfe5000",
+		Type:      model.StreamJob_SQL,
+	}
+	info, err := client.GetJobInfo(ctx, &req)
+	require.Nil(t, err)
+	fmt.Println(info)
+}

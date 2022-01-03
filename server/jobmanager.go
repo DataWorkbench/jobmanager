@@ -23,7 +23,7 @@ func (s *JobManagerServer) RunJob(ctx context.Context, req *request.JobInfo) (*r
 }
 
 func (s *JobManagerServer) GetJobInfo(ctx context.Context, req *request.JobMessage) (*response.JobInfo, error) {
-	return s.service.GetFlinkJob(ctx, req.GetType(), req.GetFlinkId(), req.GetJobId(), req.GetSpaceId(), req.GetSpaceId())
+	return s.service.GetFlinkJob(ctx, req.GetType(), req.GetJobId(), req.GetFlinkId(), req.GetSpaceId(), req.GetSpaceId())
 }
 
 func (s *JobManagerServer) CancelJob(ctx context.Context, req *request.JobMessage) (*model.EmptyStruct, error) {

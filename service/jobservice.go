@@ -67,10 +67,10 @@ func (jm *JobManagerService) CancelFlinkJob(ctx context.Context, jobType model.S
 }
 
 func (jm *JobManagerService) GetFlinkJob(ctx context.Context, jobType model.StreamJob_Type, jobId string,
-	jobName string, spaceId string, clusterId string) (*response.JobInfo, error) {
+	flinkId string, spaceId string, clusterId string) (*response.JobInfo, error) {
 	res := response.JobInfo{}
 	executor := jm.flinkExecutors[jobType]
-	job, err := executor.GetInfo(ctx, jobId, jobName, spaceId, clusterId)
+	job, err := executor.GetInfo(ctx, jobId, flinkId, spaceId, clusterId)
 	if err != nil {
 		return nil, err
 	}

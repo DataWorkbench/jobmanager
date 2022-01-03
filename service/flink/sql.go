@@ -98,8 +98,8 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 	}
 }
 
-func (sqlExec *SqlExecutor) GetInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
-	return sqlExec.bm.GetJobInfo(ctx, jobId, jobName, spaceId, clusterId)
+func (sqlExec *SqlExecutor) GetInfo(ctx context.Context, jobId string, flinkId string, spaceId string, clusterId string) (*flink.Job, error) {
+	return sqlExec.bm.GetJobInfo(ctx, jobId, flinkId, spaceId, clusterId)
 }
 
 func (sqlExec *SqlExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
