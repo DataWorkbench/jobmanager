@@ -228,7 +228,3 @@ func (bm *BaseExecutor) CancelJob(ctx context.Context, jobId string, spaceId str
 	flinkUrl := "127.0.0.1:8081"
 	return bm.flinkClient.CancelJob(flinkUrl, jobId)
 }
-
-func (bm *BaseExecutor) Lock(jobId string) error {
-	return nil
-}

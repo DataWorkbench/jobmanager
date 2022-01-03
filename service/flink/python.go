@@ -58,6 +58,9 @@ func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.JobInfo) (*
 		jobProp["parallelism"] = strconv.FormatInt(int64(info.GetArgs().GetParallelism()), 10)
 	}
 
+	if result, err = session.SubmitWithProperties("ipyflink", jobProp, info.GetCode().Scala.Code); err != nil {
+		return result, err
+	}
 	defer func() {
 		if result != nil && (len(result.Results) > 0 || len(result.JobUrls) > 0) {
 			if (result.Status.IsRunning() || result.Status.IsPending()) &&
@@ -71,9 +74,6 @@ func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.JobInfo) (*
 			}
 		}
 	}()
-	if result, err = session.SubmitWithProperties("ipyflink", jobProp, info.GetCode().Scala.Code); err != nil {
-		return result, err
-	}
 	for {
 		if result, err = session.QueryStatement(result.StatementId); err != nil {
 			return result, err
@@ -100,4 +100,8 @@ func (pyExec *PythonExecutor) GetInfo(ctx context.Context, jobId string, jobName
 
 func (pyExec *PythonExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
 	return pyExec.bm.CancelJob(ctx, jobId, spaceId, clusterId)
+}
+
+func (pyExec *PythonExecutor) Validate(code string) (bool, string, error) {
+	return true, "", nil
 }

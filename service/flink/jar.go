@@ -11,14 +11,14 @@ import (
 )
 
 type JarExecutor struct {
-	bm     *BaseExecutor
-	ctx    context.Context
+	bm  *BaseExecutor
+	ctx context.Context
 }
 
 func NewJarExecutor(bm *BaseExecutor, ctx context.Context) *JarExecutor {
 	return &JarExecutor{
-		bm:     bm,
-		ctx:    ctx,
+		bm:  bm,
+		ctx: ctx,
 	}
 }
 
@@ -26,7 +26,8 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 	jar := info.GetCode().GetJar()
 	properties := map[string]string{}
 	properties["shell.command.timeout.millisecs"] = "30000"
-	properties["shell.working.directory.user.home"] = "/zeppelin/flink/flink-1.12.3/"
+	//flinkHome := "/zeppelin/flink/flink-1.12.3/"
+	flinkHome := "/Users/apple/develop/bigdata/flink-1.12.5"
 	flinkUrl, _, err := jarExec.bm.engineClient.GetEngineInfo(ctx, info.GetSpaceId(), info.GetArgs().GetClusterId())
 	if err != nil {
 		return nil, err
@@ -38,7 +39,7 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 	localJarPath := "/tmp/" + jarName
 	builder := strings.Builder{}
 	builder.WriteString(fmt.Sprintf("hdfs dfs -get %v %v\n", jarUrl, localJarPath))
-	builder.WriteString(fmt.Sprintf("/bin/flink run -d -m %s", flinkUrl))
+	builder.WriteString(fmt.Sprintf("%s/bin/flink run -d -m %s", flinkHome, flinkUrl))
 	if info.GetArgs().GetParallelism() > 0 {
 		builder.WriteString(fmt.Sprintf(" -p %d", info.GetArgs().GetParallelism()))
 	}
@@ -56,7 +57,19 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 	if err != nil {
 		return nil, err
 	}
-
+	if result.Results != nil && len(result.Results) > 0 {
+		for _, re := range result.Results {
+			if strings.EqualFold(re.Type, "TEXT") {
+				jobInfo := strings.Split(re.Data, "JobID")
+				if len(jobInfo) == 2 {
+					jobId := strings.ReplaceAll(jobInfo[1], "\n", "")
+					if len(jobId) == 32 {
+						result.JobUrls = append(result.JobUrls, jobId)
+					}
+				}
+			}
+		}
+	}
 	return result, nil
 }
 
@@ -66,4 +79,8 @@ func (jarExec *JarExecutor) GetInfo(ctx context.Context, jobId string, jobName s
 
 func (jarExec *JarExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
 	return jarExec.bm.CancelJob(ctx, jobId, spaceId, clusterId)
+}
+
+func (jarExec *JarExecutor) Validate(code string) (bool, string, error) {
+	return true, "", nil
 }

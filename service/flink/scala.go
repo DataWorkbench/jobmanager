@@ -58,6 +58,9 @@ func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.JobInfo) 
 		jobProp["parallelism"] = strconv.FormatInt(int64(info.GetArgs().GetParallelism()), 10)
 	}
 
+	if result, err = session.SubmitWithProperties("", jobProp, info.GetCode().Scala.Code); err != nil {
+		return nil, err
+	}
 	defer func() {
 		if result != nil && (len(result.Results) > 0 || len(result.JobUrls) > 0) {
 			if (result.Status.IsRunning() || result.Status.IsPending()) &&
@@ -71,9 +74,6 @@ func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.JobInfo) 
 			}
 		}
 	}()
-	if result, err = session.SubmitWithProperties("", jobProp, info.GetCode().Scala.Code); err != nil {
-		return nil, err
-	}
 	for {
 		if result, err = session.QueryStatement(result.StatementId); err != nil {
 			return result, err
@@ -100,4 +100,8 @@ func (scalaExec *ScalaExecutor) GetInfo(ctx context.Context, jobId string, jobNa
 
 func (scalaExec *ScalaExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
 	return scalaExec.bm.CancelJob(ctx, jobId, spaceId, clusterId)
+}
+
+func (scalaExec *ScalaExecutor) Validate(code string) (bool, string, error) {
+	return true, "", nil
 }

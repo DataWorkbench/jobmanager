@@ -2,6 +2,7 @@ package flink
 
 import (
 	"context"
+	"encoding/base64"
 	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/zeppelin"
 	"github.com/DataWorkbench/gproto/pkg/model"
@@ -59,6 +60,10 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 	if strings.Contains(strings.ToLower(info.GetCode().Sql.Code), "insert") {
 		jobProp["runAsOne"] = "true"
 	}
+	if result, err = session.SubmitWithProperties("ssql", jobProp, info.GetCode().Sql.Code); err != nil {
+		return result, err
+	}
+	// TODO if execute with batch type ssql waitUntilFinished
 	defer func() {
 		if result != nil && (len(result.Results) > 0 || len(result.JobUrls) > 0) {
 			if (result.Status.IsRunning() || result.Status.IsPending()) &&
@@ -72,10 +77,6 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 			}
 		}
 	}()
-	// TODO if execute with batch type ssql waitUntilFinished
-	if result, err = session.SubmitWithProperties("ssql", jobProp, info.GetCode().Sql.Code); err != nil {
-		return result, err
-	}
 
 	for {
 		if result, err = session.QueryStatement(result.StatementId); err != nil {
@@ -103,4 +104,20 @@ func (sqlExec *SqlExecutor) GetInfo(ctx context.Context, jobId string, jobName s
 
 func (sqlExec *SqlExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
 	return sqlExec.bm.CancelJob(ctx, jobId, spaceId, clusterId)
+}
+
+func (sqlExec *SqlExecutor) Validate(code string) (bool, string, error) {
+	builder := strings.Builder{}
+	builder.WriteString("java -jar /Users/apple/develop/java/sql-vadilator/target/sql-validator.jar ")
+	builder.WriteString(base64.StdEncoding.EncodeToString([]byte(code)))
+	session := zeppelin.NewZSession(sqlExec.bm.zeppelinConfig, "sh")
+	if err := session.Start(); err != nil {
+		return false, "", err
+	}
+	if result, err := session.Exec(builder.String()); err != nil {
+		return false, "", err
+	} else if result.Results != nil && len(result.Results) > 0 {
+		return false, result.Results[0].Data, nil
+	}
+	return true, "", nil
 }

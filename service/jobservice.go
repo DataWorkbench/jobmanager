@@ -78,6 +78,18 @@ func (jm *JobManagerService) GetFlinkJob(ctx context.Context, jobType model.Stre
 	return &res, nil
 }
 
+func (jm *JobManagerService) ValidateCode(jobType model.StreamJob_Type, code string) (*response.JobValidate, error) {
+	res := response.JobValidate{}
+	executor := jm.flinkExecutors[jobType]
+	if flag, msg, err := executor.Validate(code); err != nil {
+		return nil, err
+	} else {
+		res.Message = msg
+		res.Flag = flag
+		return &res, nil
+	}
+}
+
 func createFlinkExecutor(ctx context.Context, bm *flinkService.BaseExecutor) map[model.StreamJob_Type]flinkService.Executor {
 	executors := map[model.StreamJob_Type]flinkService.Executor{}
 	executors[model.StreamJob_SQL] = flinkService.NewExecutor(ctx, model.StreamJob_SQL, bm)
