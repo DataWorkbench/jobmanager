@@ -2,28 +2,24 @@ package flink
 
 import (
 	"context"
+	"github.com/DataWorkbench/common/flink"
+	"github.com/DataWorkbench/common/zeppelin"
+	"github.com/DataWorkbench/gproto/pkg/model"
+	"github.com/DataWorkbench/gproto/pkg/request"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/DataWorkbench/common/flink"
-	"github.com/DataWorkbench/common/zeppelin"
-	"github.com/DataWorkbench/glog"
-	"github.com/DataWorkbench/gproto/pkg/model"
-	"github.com/DataWorkbench/gproto/pkg/request"
 )
 
 type SqlExecutor struct {
-	bm     *BaseExecutor
-	ctx    context.Context
-	logger *glog.Logger
+	bm  *BaseExecutor
+	ctx context.Context
 }
 
-func NewSqlExecutor(ctx context.Context, bm *BaseExecutor, logger *glog.Logger) *SqlExecutor {
+func NewSqlExecutor(ctx context.Context, bm *BaseExecutor) *SqlExecutor {
 	return &SqlExecutor{
-		bm:     bm,
-		ctx:    ctx,
-		logger: logger,
+		bm:  bm,
+		ctx: ctx,
 	}
 }
 
@@ -63,25 +59,30 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 	if strings.Contains(strings.ToLower(info.GetCode().Sql.Code), "insert") {
 		jobProp["runAsOne"] = "true"
 	}
+	defer func() {
+		if result != nil && (len(result.Results) > 0 || len(result.JobUrls) > 0) {
+			if (result.Status.IsRunning() || result.Status.IsPending()) &&
+				result.JobUrls != nil && len(result.JobUrls) > 0 {
+				_ = session.Stop()
+			} else {
+				jobInfo := sqlExec.bm.TransResult(info.SpaceId, info.JobId, result)
+				if err = sqlExec.bm.UpsertResult(ctx, jobInfo); err != nil {
+					_ = session.Stop()
+				}
+			}
+		}
+	}()
 	// TODO if execute with batch type ssql waitUntilFinished
 	if result, err = session.SubmitWithProperties("ssql", jobProp, info.GetCode().Sql.Code); err != nil {
 		return result, err
 	}
-	if result, err = session.WaitUntilRunning(result.StatementId); err != nil {
-		return result, err
-	}
-	start := time.Now().Unix()
+
 	for {
 		if result, err = session.QueryStatement(result.StatementId); err != nil {
 			return result, err
 		}
 		if result.Status.IsFailed() {
-			var reason string
-			if len(result.Results) > 0 {
-				reason = result.Results[0].Data
-				sqlExec.logger.Warn().Msg(reason)
-			}
-			return result, nil
+			return result, err
 		}
 		if len(result.JobUrls) > 0 {
 			jobUrl := result.JobUrls[0]
@@ -92,9 +93,7 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 			}
 			return result, nil
 		}
-		if time.Now().Unix()-start >= 30000 {
-			return result, nil
-		}
+		time.Sleep(time.Second * 1)
 	}
 }
 

@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/DataWorkbench/common/gormwrap"
+	"gorm.io/gorm"
 	"io"
 	"os"
 	"os/signal"
@@ -36,6 +38,7 @@ func Start() (err error) {
 	ctx := glog.WithContext(context.Background(), lp)
 
 	var (
+		db             *gorm.DB
 		rpcServer      *grpcwrap.Server
 		metricServer   *metrics.Server
 		tracer         gtrace.Tracer
@@ -58,6 +61,11 @@ func Start() (err error) {
 	}()
 
 	if tracer, tracerCloser, err = gtrace.New(cfg.Tracer); err != nil {
+		return
+	}
+
+	db, err = gormwrap.NewMySQLConn(ctx, cfg.MySQL, gormwrap.WithTracer(tracer))
+	if err != nil {
 		return
 	}
 
@@ -101,7 +109,7 @@ func Start() (err error) {
 			RetryCount:    0,
 			QueryInterval: 0,
 		}
-		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(service.NewJobManagerService(ctx, udfClient, engineClient, resourceClient,
+		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(service.NewJobManagerService(ctx, db, udfClient, engineClient, resourceClient,
 			lp, zeppelinConfig, flinkConfig)))
 	})
 

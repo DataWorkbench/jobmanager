@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/zeppelin"
-	"github.com/DataWorkbench/glog"
 	"github.com/DataWorkbench/gproto/pkg/model"
 	"github.com/DataWorkbench/gproto/pkg/request"
 )
@@ -15,17 +14,17 @@ type Executor interface {
 	GetInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error)
 }
 
-func NewExecutor(ctx context.Context, jobType model.StreamJob_Type, bm *BaseExecutor, logger *glog.Logger) Executor {
+func NewExecutor(ctx context.Context, jobType model.StreamJob_Type, bm *BaseExecutor) Executor {
 	var executor Executor
 	switch jobType {
 	case model.StreamJob_SQL:
-		executor = NewSqlExecutor(ctx, bm, logger)
+		executor = NewSqlExecutor(ctx, bm)
 	case model.StreamJob_Jar:
-		executor = NewJarExecutor(bm, ctx, logger)
+		executor = NewJarExecutor(bm, ctx)
 	case model.StreamJob_Python:
-		executor = NewPythonExecutor(bm, ctx, logger)
+		executor = NewPythonExecutor(bm, ctx)
 	case model.StreamJob_Scala:
-		executor = NewScalaExecutor(bm, ctx, logger)
+		executor = NewScalaExecutor(bm, ctx)
 	default:
 	}
 	return executor

@@ -8,22 +8,19 @@ import (
 
 	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/zeppelin"
-	"github.com/DataWorkbench/glog"
 	"github.com/DataWorkbench/gproto/pkg/model"
 	"github.com/DataWorkbench/gproto/pkg/request"
 )
 
 type PythonExecutor struct {
-	bm     *BaseExecutor
-	ctx    context.Context
-	logger *glog.Logger
+	bm  *BaseExecutor
+	ctx context.Context
 }
 
-func NewPythonExecutor(bm *BaseExecutor, ctx context.Context, logger *glog.Logger) *ScalaExecutor {
+func NewPythonExecutor(bm *BaseExecutor, ctx context.Context) *ScalaExecutor {
 	return &ScalaExecutor{
-		bm:     bm,
-		ctx:    ctx,
-		logger: logger,
+		bm:  bm,
+		ctx: ctx,
 	}
 }
 
@@ -60,24 +57,29 @@ func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.JobInfo) (*
 	if info.GetArgs().GetParallelism() > 0 {
 		jobProp["parallelism"] = strconv.FormatInt(int64(info.GetArgs().GetParallelism()), 10)
 	}
+
+	defer func() {
+		if result != nil && (len(result.Results) > 0 || len(result.JobUrls) > 0) {
+			if (result.Status.IsRunning() || result.Status.IsPending()) &&
+				result.JobUrls != nil && len(result.JobUrls) > 0 {
+				_ = session.Stop()
+			} else {
+				jobInfo := pyExec.bm.TransResult(info.SpaceId, info.JobId, result)
+				if err = pyExec.bm.UpsertResult(ctx, jobInfo); err != nil {
+					_ = session.Stop()
+				}
+			}
+		}
+	}()
 	if result, err = session.SubmitWithProperties("ipyflink", jobProp, info.GetCode().Scala.Code); err != nil {
 		return result, err
 	}
-	if result, err = session.WaitUntilRunning(result.StatementId); err != nil {
-		return result, err
-	}
-	start := time.Now().Unix()
 	for {
 		if result, err = session.QueryStatement(result.StatementId); err != nil {
 			return result, err
 		}
 		if result.Status.IsFailed() {
-			var reason string
-			if len(result.Results) > 0 {
-				reason = result.Results[0].Data
-				pyExec.logger.Warn().Msg(reason)
-			}
-			return result, nil
+			return result, err
 		}
 		if len(result.JobUrls) > 0 {
 			jobUrl := result.JobUrls[0]
@@ -88,9 +90,7 @@ func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.JobInfo) (*
 			}
 			return result, nil
 		}
-		if time.Now().Unix()-start >= 30000 {
-			return result, nil
-		}
+		time.Sleep(time.Second * 1)
 	}
 }
 

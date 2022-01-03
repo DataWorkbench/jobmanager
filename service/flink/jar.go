@@ -7,21 +7,18 @@ import (
 
 	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/zeppelin"
-	"github.com/DataWorkbench/glog"
 	"github.com/DataWorkbench/gproto/pkg/request"
 )
 
 type JarExecutor struct {
 	bm     *BaseExecutor
 	ctx    context.Context
-	logger *glog.Logger
 }
 
-func NewJarExecutor(bm *BaseExecutor, ctx context.Context, logger *glog.Logger) *JarExecutor {
+func NewJarExecutor(bm *BaseExecutor, ctx context.Context) *JarExecutor {
 	return &JarExecutor{
 		bm:     bm,
 		ctx:    ctx,
-		logger: logger,
 	}
 }
 
@@ -30,7 +27,7 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 	properties := map[string]string{}
 	properties["shell.command.timeout.millisecs"] = "30000"
 	properties["shell.working.directory.user.home"] = "/zeppelin/flink/flink-1.12.3/"
-	flinkUrl, _, err := jarExec.bm.getEngineInfo(ctx, info.GetSpaceId(), info.GetArgs().GetClusterId())
+	flinkUrl, _, err := jarExec.bm.engineClient.GetEngineInfo(ctx, info.GetSpaceId(), info.GetArgs().GetClusterId())
 	if err != nil {
 		return nil, err
 	}

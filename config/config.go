@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/DataWorkbench/common/gormwrap"
 	"io/ioutil"
 	"os"
 	"time"
@@ -30,6 +31,7 @@ type Config struct {
 	UdfManagerServer      *grpcwrap.ClientConfig `json:"udfmanager_server"      yaml:"udfmanager_server"      env:"UDFMANAGER_SERVER" validate:"required"`
 	GRPCServer            *grpcwrap.ServerConfig `json:"grpc_server"    yaml:"grpc_server"    env:"GRPC_SERVER"         validate:"required"`
 	MetricsServer         *metrics.Config        `json:"metrics_server" yaml:"metrics_server" env:"METRICS_SERVER"      validate:"required"`
+	MySQL                 *gormwrap.MySQLConfig  `json:"mysql"          yaml:"mysql"          env:"MYSQL"               validate:"required"`
 	Tracer                *gtrace.Config         `json:"tracer"         yaml:"tracer"         env:"TRACER"              validate:"required"`
 }
 

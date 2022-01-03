@@ -2,19 +2,24 @@ package flink
 
 import (
 	"context"
-	"strings"
-
 	"github.com/DataWorkbench/common/constants"
 	"github.com/DataWorkbench/common/flink"
+	"github.com/DataWorkbench/common/qerror"
 	"github.com/DataWorkbench/common/zeppelin"
+	"github.com/DataWorkbench/glog"
 	"github.com/DataWorkbench/gproto/pkg/model"
 	"github.com/DataWorkbench/gproto/pkg/request"
 	"github.com/DataWorkbench/jobmanager/utils"
+	"github.com/pkg/errors"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	"strings"
 )
 
 var (
-	Quote    = "$qc$"
-	UDFQuote = Quote + "_udf_name_" + Quote
+	Quote      = "$qc$"
+	UDFQuote   = Quote + "_udf_name_" + Quote
+	JobManager = "job_manager"
 )
 
 const (
@@ -23,35 +28,83 @@ const (
 )
 
 type BaseExecutor struct {
+	ctx            context.Context
+	db             *gorm.DB
+	logger         *glog.Logger
 	engineClient   utils.EngineClient
 	udfClient      utils.UdfClient
 	resourceClient utils.ResourceClient
 	flinkClient    *flink.Client
 	zeppelinConfig zeppelin.ClientConfig
+	jobInfos       chan *model.JobInfo
 }
 
-func NewBaseManager(engineClient utils.EngineClient, udfClient utils.UdfClient, resourceClient utils.ResourceClient,
+type Udf struct {
+	udfType model.UDFInfo_Language
+	code    string
+}
+
+func NewBaseManager(ctx context.Context, db *gorm.DB, logger *glog.Logger, engineClient utils.EngineClient, udfClient utils.UdfClient, resourceClient utils.ResourceClient,
 	flinkConfig flink.ClientConfig, zeppelinConfig zeppelin.ClientConfig) *BaseExecutor {
 	return &BaseExecutor{
+		ctx:            ctx,
+		db:             db,
+		logger:         logger,
 		engineClient:   engineClient,
 		udfClient:      udfClient,
 		resourceClient: resourceClient,
 		flinkClient:    flink.NewFlinkClient(flinkConfig),
 		zeppelinConfig: zeppelinConfig,
+		jobInfos:       make(chan *model.JobInfo, 100),
 	}
 }
 
-func (bm *BaseExecutor) getEngineInfo(ctx context.Context, spaceId string, clusterId string) (url string, version string, err error) {
-	api, err := bm.engineClient.Client.DescribeFlinkClusterAPI(ctx, &request.DescribeFlinkClusterAPI{
-		SpaceId:   spaceId,
-		ClusterId: clusterId,
-	})
-	if err != nil {
-		return
+func (bm *BaseExecutor) TransResult(spaceId string, jobId string, executeResult *zeppelin.ExecuteResult) *model.JobInfo {
+	var data string
+	for _, re := range executeResult.Results {
+		if strings.EqualFold("TEXT", re.Type) {
+			data = re.Data
+		}
 	}
-	url = api.URL
-	version = api.Version
-	return
+	jobInfo := model.JobInfo{
+		SpaceId:     spaceId,
+		JobId:       jobId,
+		NoteId:      executeResult.SessionInfo.NoteId,
+		SessionId:   executeResult.SessionInfo.SessionId,
+		StatementId: executeResult.StatementId,
+		Data:        data,
+	}
+	switch executeResult.Status {
+	case zeppelin.ERROR:
+		jobInfo.Status = model.JobInfo_Failed
+	case zeppelin.ABORT:
+		jobInfo.Status = model.JobInfo_Suspended
+	case zeppelin.FINISHED:
+		jobInfo.Status = model.JobInfo_Finished
+	default:
+		jobInfo.Status = model.JobInfo_Initializing
+	}
+	return &jobInfo
+}
+
+func (bm *BaseExecutor) UpsertResult(ctx context.Context, jobInfo *model.JobInfo) error {
+	db := bm.db.WithContext(ctx)
+	return db.Table(JobManager).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "job_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"session_id", "statement_id", "flink_id", "status", "data"}),
+	}).Create(jobInfo).Error
+}
+
+func (bm *BaseExecutor) GetResult(ctx context.Context, jobId string) (*model.JobInfo, error) {
+	var jobInfo model.JobInfo
+	db := bm.db.WithContext(ctx)
+	if err := db.Table(JobManager).Clauses(clause.Locking{Strength: "UPDATE"}).Where("job_id", jobId).First(&jobInfo).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = qerror.ResourceNotExists.Format(jobId)
+		}
+		return nil, err
+	}
+	return &jobInfo, nil
 }
 
 func (bm *BaseExecutor) getConnectors(builtInConnectors []string, flinkVersion string) string {
@@ -71,11 +124,6 @@ func (bm *BaseExecutor) getConnectors(builtInConnectors []string, flinkVersion s
 		executeJars = executeJars[:strings.LastIndex(executeJars, ",")-1]
 	}
 	return executeJars
-}
-
-type Udf struct {
-	udfType model.UDFInfo_Language
-	code    string
 }
 
 func (bm *BaseExecutor) getUDFs(ctx context.Context, udfIds []string) ([]*Udf, error) {
@@ -119,20 +167,19 @@ func (bm *BaseExecutor) getUDFJars(udfs []*Udf) string {
 func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.JobInfo, udfs []*Udf) (map[string]string, error) {
 	properties := map[string]string{}
 	properties["FLINK_HOME"] = "/Users/apple/develop/bigdata/flink-1.12.5"
-	/*spaceId := info.GetSpaceId()
-	clusterId := info.GetArgs().GetClusterId()
-	flinkUrl, flinkVersion, err := bm.getEngineInfo(ctx, spaceId, clusterId)
-	if err != nil {
-		return nil, err
-	}
-	host := flinkUrl[:strings.Index(flinkUrl, ":")]
-	port := flinkUrl[strings.Index(flinkUrl, ":")+1:]
-	if host != "" && len(host) > 0 && port != "" && len(port) > 0 {
-		properties["flink.execution.remote.host"] = host
-		properties["flink.execution.remote.port"] = port
-	} else {
-		return nil, qerror.ParseEngineFlinkUrlFailed.Format(flinkUrl)
-	}*/
+
+	//flinkUrl, flinkVersion, err := bm.engineClient.GetEngineInfo(ctx, info.GetSpaceId(), info.GetArgs().GetClusterId())
+	//if err != nil {
+	//	return nil, err
+	//}
+	//host := flinkUrl[:strings.Index(flinkUrl, ":")]
+	//port := flinkUrl[strings.Index(flinkUrl, ":")+1:]
+	//if host != "" && len(host) > 0 && port != "" && len(port) > 0 {
+	//	properties["flink.execution.remote.host"] = host
+	//	properties["flink.execution.remote.port"] = port
+	//} else {
+	//	return nil, qerror.ParseEngineFlinkUrlFailed.Format(flinkUrl)
+	//}
 
 	properties["flink.execution.mode"] = "remote"
 	properties["flink.execution.remote.host"] = "127.0.0.1"
@@ -150,28 +197,38 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.J
 	return properties, nil
 }
 
-func (bm *BaseExecutor) GetJobInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
-	//engineRes, err := bm.engineClient.Client.DescribeFlinkClusterAPI(ctx, &request.DescribeFlinkClusterAPI{
-	//	SpaceId:   spaceId,
-	//	ClusterId: clusterId,
-	//})
-	//if err != nil {
-	//	return nil, err
-	//}
-	//flinkUrl := engineRes.GetURL()
-	flinkUrl := "http://127.0.0.1:8081"
-	return bm.flinkClient.GetJobInfo(flinkUrl, jobId, jobName)
+func (bm *BaseExecutor) GetJobInfo(ctx context.Context, jobId string, flinkId string, spaceId string, clusterId string) (*flink.Job, error) {
+Retry:
+	if flinkId != "" && len(flinkId) == 32 {
+		//flinkUrl, _, err := bm.engineClient.GetEngineInfo(ctx, spaceId, clusterId)
+		//if err != nil {
+		//	return nil, err
+		//}
+		flinkUrl := "127.0.0.1:8081"
+		return bm.flinkClient.GetJobInfoByJobId(flinkUrl, flinkId)
+	} else {
+		jobInfo, err := bm.GetResult(ctx, jobId)
+		if err != nil {
+			return nil, err
+		}
+		if jobInfo.FlinkId != "" && len(jobInfo.FlinkId) == 32 {
+			flinkId = jobInfo.FlinkId
+			goto Retry
+		}
+		return nil, nil
+	}
 }
 
 func (bm *BaseExecutor) CancelJob(ctx context.Context, jobId string, spaceId string, clusterId string) error {
-	//engineRes, err := bm.engineClient.Client.DescribeFlinkClusterAPI(ctx, &request.DescribeFlinkClusterAPI{
-	//	SpaceId:   spaceId,
-	//	ClusterId: clusterId,
-	//})
+	//flinkUrl, _, err := bm.engineClient.GetEngineInfo(ctx, spaceId, clusterId)
 	//if err != nil {
 	//	return err
 	//}
-	//flinkUrl := engineRes.GetURL()
-	flinkUrl := "http://127.0.0.1:8081"
+
+	flinkUrl := "127.0.0.1:8081"
 	return bm.flinkClient.CancelJob(flinkUrl, jobId)
+}
+
+func (bm *BaseExecutor) Lock(jobId string) error {
+	return nil
 }
