@@ -62,3 +62,16 @@ func Test_Run(t *testing.T) {
 	require.Nil(t, err)
 	fmt.Println(job)
 }
+
+func Test_Validate(t *testing.T) {
+	var code = "create table if not exists datagen(id int,name string);" +
+		"create table if not exists print(,id int,name string);" +
+		"insert into print select * from datagen;"
+	req := request.JobValidate{
+		Type: model.StreamJob_SQL,
+		Code: code,
+	}
+	res, err := client.Validate(ctx, &req)
+	require.Nil(t, err)
+	fmt.Println(res.Flag, res.Message)
+}

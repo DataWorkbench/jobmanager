@@ -29,3 +29,7 @@ func (s *JobManagerServer) GetJobInfo(ctx context.Context, req *request.JobMessa
 func (s *JobManagerServer) CancelJob(ctx context.Context, req *request.JobMessage) (*model.EmptyStruct, error) {
 	return &model.EmptyStruct{}, s.service.CancelFlinkJob(ctx, req.GetType(), req.GetFlinkId(), req.GetSpaceId(), req.GetClusterId())
 }
+
+func (s *JobManagerServer) Validate(ctx context.Context, req *request.JobValidate) (*response.JobValidate, error) {
+	return s.service.ValidateCode(req.Type, req.Code)
+}
