@@ -31,8 +31,8 @@ func NewJobManagerService(ctx context.Context, db *gorm.DB, uClient utils.UdfCli
 	}
 }
 
-func (jm *JobManagerService) RunFlinkJob(ctx context.Context, jobInfo *request.JobInfo) (*response.JobInfo, error) {
-	res := response.JobInfo{}
+func (jm *JobManagerService) RunFlinkJob(ctx context.Context, jobInfo *request.RunJob) (*response.RunJob, error) {
+	res := response.RunJob{}
 	executor := jm.flinkExecutors[jobInfo.Code.Type]
 
 	result, err := executor.Run(ctx, jobInfo)
@@ -43,20 +43,15 @@ func (jm *JobManagerService) RunFlinkJob(ctx context.Context, jobInfo *request.J
 	switch result.Status {
 	case zeppelin.RUNNING:
 		res.State = model.StreamJobInst_Running
-	case zeppelin.ABORT:
-		res.State = model.StreamJobInst_Suspended
+	case zeppelin.ABORT, zeppelin.FINISHED:
+		res.State = model.StreamJobInst_Succeed
 	case zeppelin.ERROR:
 		res.State = model.StreamJobInst_Failed
-	case zeppelin.FINISHED:
-		res.State = model.StreamJobInst_Succeed
 	}
 	for _, r := range result.Results {
 		if strings.EqualFold("TEXT", r.Type) {
-			res.Data = r.Data
+			res.Message = r.Data
 		}
-	}
-	if len(result.JobId) == 32 {
-		return jm.GetFlinkJob(ctx, jobInfo.Code.Type, jobInfo.JobId, result.JobId, jobInfo.SpaceId, jobInfo.Args.ClusterId)
 	}
 	return &res, nil
 }
@@ -66,15 +61,13 @@ func (jm *JobManagerService) CancelFlinkJob(ctx context.Context, jobType model.S
 	return executor.Cancel(ctx, jobId, spaceId, clusterId)
 }
 
-func (jm *JobManagerService) GetFlinkJob(ctx context.Context, jobType model.StreamJob_Type, jobId string,
-	flinkId string, spaceId string, clusterId string) (*response.JobInfo, error) {
-	res := response.JobInfo{}
+func (jm *JobManagerService) GetFlinkJob(ctx context.Context, jobType model.StreamJob_Type, instanceId string, spaceId string, clusterId string) (*response.GetJobInfo, error) {
+	res := response.GetJobInfo{}
 	executor := jm.flinkExecutors[jobType]
-	job, err := executor.GetInfo(ctx, jobId, flinkId, spaceId, clusterId)
+	job, err := executor.GetInfo(ctx, instanceId, spaceId, clusterId)
 	if err != nil {
 		return nil, err
 	}
-	res.JobId = job.Jid
 	switch job.State {
 	case "FAILED":
 		res.State = model.StreamJobInst_Failed
@@ -88,14 +81,18 @@ func (jm *JobManagerService) GetFlinkJob(ctx context.Context, jobType model.Stre
 	return &res, nil
 }
 
-func (jm *JobManagerService) ValidateCode(jobType model.StreamJob_Type, code string) (*response.JobValidate, error) {
-	res := response.JobValidate{}
-	executor := jm.flinkExecutors[jobType]
-	if flag, msg, err := executor.Validate(code); err != nil {
+func (jm *JobManagerService) ValidateCode(jobCode *model.StreamJobCode) (*response.StreamJobCodeSyntax, error) {
+	res := response.StreamJobCodeSyntax{}
+	executor := jm.flinkExecutors[jobCode.Type]
+	if flag, msg, err := executor.Validate(jobCode); err != nil {
 		return nil, err
 	} else {
-		res.Message = msg
-		res.Flag = flag
+		if flag {
+			res.Result = response.StreamJobCodeSyntax_Correct
+		} else {
+			res.Result = response.StreamJobCodeSyntax_Incorrect
+			res.Message = msg
+		}
 		return &res, nil
 	}
 }

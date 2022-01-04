@@ -51,8 +51,8 @@ func Test_RunSql(t *testing.T) {
 		Scala:     nil,
 		Python:    nil,
 	}
-	req := request.JobInfo{
-		JobId:         "syx-JHGYFjhKwUfaQDHZ",
+	req := request.RunJob{
+		InstanceId:    "syx-JHGYFjhKwUfaQDHZ",
 		SpaceId:       spaceId,
 		Args:          &args,
 		Code:          &code,
@@ -64,26 +64,21 @@ func Test_RunSql(t *testing.T) {
 }
 
 func Test_Validate(t *testing.T) {
-	var code = "create table if not exists datagen(id int,name string);" +
-		"create table if not exists print(,id int,name string);" +
-		"insert into print select * from datagen;"
-	req := request.JobValidate{
-		Type: model.StreamJob_SQL,
-		Code: code,
-	}
-	res, err := client.Validate(ctx, &req)
-	require.Nil(t, err)
-	fmt.Println(res.Flag, res.Message)
+	//var code = "create table if not exists datagen(id int,name string);" +
+	//	"create table if not exists print(,id int,name string);" +
+	//	"insert into print select * from datagen;"
+	//req := request.ValidateJob{Code: code}
+	//res, err := client.ValidateJob(ctx, &req)
+	//require.Nil(t, err)
+	//fmt.Println(res.Flag, res.Message)
 }
 
 func Test_GetInfo(t *testing.T) {
-	var flinkId = "8aa2bb960972ce7351745321bfc8dde7"
-	req := request.JobMessage{
-		JobId:     "syx-JHGYFjhKwUfaQDHZ",
-		FlinkId:   flinkId,
-		SpaceId:   spaceId,
-		ClusterId: "cfi-05636e792cfe5000",
-		Type:      model.StreamJob_SQL,
+	req := request.GetJobInfo{
+		InstanceId: "syx-JHGYFjhKwUfaQDHZ",
+		SpaceId:    spaceId,
+		ClusterId:  "cfi-05636e792cfe5000",
+		Type:       model.StreamJob_SQL,
 	}
 	info, err := client.GetJobInfo(ctx, &req)
 	require.Nil(t, err)

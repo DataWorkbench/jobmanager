@@ -9,10 +9,10 @@ import (
 )
 
 type Executor interface {
-	Run(ctx context.Context, info *request.JobInfo) (*zeppelin.ExecuteResult, error)
-	Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error
-	GetInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error)
-	Validate(code string) (bool, string, error)
+	Run(ctx context.Context, info *request.RunJob) (*zeppelin.ExecuteResult, error)
+	Cancel(ctx context.Context, instanceId string, spaceId string, clusterId string) error
+	GetInfo(ctx context.Context, instanceId string, spaceId string, clusterId string) (*flink.Job, error)
+	Validate(jobCode *model.StreamJobCode) (bool, string, error)
 }
 
 func NewExecutor(ctx context.Context, jobType model.StreamJob_Type, bm *BaseExecutor) Executor {

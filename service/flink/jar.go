@@ -3,6 +3,7 @@ package flink
 import (
 	"context"
 	"fmt"
+	"github.com/DataWorkbench/gproto/pkg/model"
 	"strings"
 
 	"github.com/DataWorkbench/common/flink"
@@ -22,7 +23,7 @@ func NewJarExecutor(bm *BaseExecutor, ctx context.Context) *JarExecutor {
 	}
 }
 
-func (jarExec *JarExecutor) Run(ctx context.Context, info *request.JobInfo) (*zeppelin.ExecuteResult, error) {
+func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ExecuteResult, error) {
 	jar := info.GetCode().GetJar()
 	properties := map[string]string{}
 	properties["shell.command.timeout.millisecs"] = "30000"
@@ -64,7 +65,7 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 			if len(result.JobId) != 32 && (result.Status.IsRunning() || result.Status.IsPending()) {
 				_ = session.Stop()
 			} else {
-				jobInfo := jarExec.bm.TransResult(info.SpaceId, info.JobId, result)
+				jobInfo := jarExec.bm.TransResult(info.SpaceId, info.InstanceId, result)
 				if err := jarExec.bm.UpsertResult(ctx, jobInfo); err != nil {
 					_ = session.Stop()
 				}
@@ -87,14 +88,14 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 	return result, nil
 }
 
-func (jarExec *JarExecutor) GetInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
-	return jarExec.bm.GetJobInfo(ctx, jobId, jobName, spaceId, clusterId)
+func (jarExec *JarExecutor) GetInfo(ctx context.Context, instanceId string, spaceId string, clusterId string) (*flink.Job, error) {
+	return jarExec.bm.GetJobInfo(ctx, instanceId, spaceId, clusterId)
 }
 
-func (jarExec *JarExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
-	return jarExec.bm.CancelJob(ctx, jobId, spaceId, clusterId)
+func (jarExec *JarExecutor) Cancel(ctx context.Context, instanceId string, spaceId string, clusterId string) error {
+	return jarExec.bm.CancelJob(ctx, instanceId, spaceId, clusterId)
 }
 
-func (jarExec *JarExecutor) Validate(code string) (bool, string, error) {
+func (jarExec *JarExecutor) Validate(jobCode *model.StreamJobCode) (bool, string, error) {
 	return true, "", nil
 }

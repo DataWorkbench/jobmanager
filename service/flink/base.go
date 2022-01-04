@@ -95,12 +95,12 @@ func (bm *BaseExecutor) UpsertResult(ctx context.Context, jobInfo *model.JobInfo
 	}).Create(jobInfo).Error
 }
 
-func (bm *BaseExecutor) GetResult(ctx context.Context, jobId string) (*model.JobInfo, error) {
+func (bm *BaseExecutor) GetResult(ctx context.Context, instanceId string) (*model.JobInfo, error) {
 	var jobInfo model.JobInfo
 	db := bm.db.WithContext(ctx)
-	if err := db.Table(JobManager).Clauses(clause.Locking{Strength: "UPDATE"}).Where("job_id", jobId).First(&jobInfo).Error; err != nil {
+	if err := db.Table(JobManager).Clauses(clause.Locking{Strength: "UPDATE"}).Where("job_id", instanceId).First(&jobInfo).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			err = qerror.ResourceNotExists.Format(jobId)
+			err = qerror.ResourceNotExists.Format(instanceId)
 		}
 		return nil, err
 	}
@@ -164,7 +164,7 @@ func (bm *BaseExecutor) getUDFJars(udfs []*Udf) string {
 	return executionUdfJars
 }
 
-func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.JobInfo, udfs []*Udf) (map[string]string, error) {
+func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.RunJob, udfs []*Udf) (map[string]string, error) {
 	properties := map[string]string{}
 	properties["FLINK_HOME"] = "/Users/apple/develop/bigdata/flink-1.12.5"
 
@@ -197,21 +197,42 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.J
 	return properties, nil
 }
 
-func (bm *BaseExecutor) GetJobInfo(ctx context.Context, jobId string, flinkId string, spaceId string, clusterId string) (*flink.Job, error) {
+func (bm *BaseExecutor) GetJobInfo(ctx context.Context, instanceId string, spaceId string, clusterId string) (*flink.Job, error) {
 	//flinkUrl, _, err := bm.engineClient.GetEngineInfo(ctx, spaceId, clusterId)
 	//if err != nil {
 	//	return nil, err
 	//}
+
 	flinkUrl := "127.0.0.1:8081"
-	return bm.flinkClient.GetJobInfoByJobId(flinkUrl, flinkId)
+	result, err := bm.GetResult(ctx, instanceId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// TODO 没有这条记录
+		}
+		return nil, err
+	}
+	if len(result.FlinkId) != 32 {
+		// TODO 记录下来
+	}
+	return bm.flinkClient.GetJobInfoByJobId(flinkUrl, result.FlinkId)
 }
 
-func (bm *BaseExecutor) CancelJob(ctx context.Context, jobId string, spaceId string, clusterId string) error {
+func (bm *BaseExecutor) CancelJob(ctx context.Context, instanceId string, spaceId string, clusterId string) error {
 	//flinkUrl, _, err := bm.engineClient.GetEngineInfo(ctx, spaceId, clusterId)
 	//if err != nil {
 	//	return err
 	//}
 
 	flinkUrl := "127.0.0.1:8081"
-	return bm.flinkClient.CancelJob(flinkUrl, jobId)
+	result, err := bm.GetResult(ctx, instanceId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			//TODO 没有这条记录
+		}
+		return err
+	}
+	if len(result.FlinkId) != 32 {
+		// TODO 记录下来,返回失败
+	}
+	return bm.flinkClient.CancelJob(flinkUrl, result.FlinkId)
 }

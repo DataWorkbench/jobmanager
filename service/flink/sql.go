@@ -24,7 +24,7 @@ func NewSqlExecutor(ctx context.Context, bm *BaseExecutor) *SqlExecutor {
 	}
 }
 
-func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.JobInfo) (*zeppelin.ExecuteResult, error) {
+func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ExecuteResult, error) {
 	udfs, err := sqlExec.bm.getUDFs(ctx, info.GetArgs().GetUdfs())
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 		}
 	}
 	jobProp := map[string]string{}
-	jobProp["jobName"] = info.GetJobId()
+	jobProp["jobName"] = info.GetInstanceId()
 	if info.GetArgs().GetParallelism() > 0 {
 		jobProp["parallelism"] = strconv.FormatInt(int64(info.GetArgs().GetParallelism()), 10)
 	}
@@ -69,7 +69,7 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 			if len(result.JobId) != 32 && (result.Status.IsRunning() || result.Status.IsPending()) {
 				_ = session.Stop()
 			} else {
-				jobInfo := sqlExec.bm.TransResult(info.SpaceId, info.JobId, result)
+				jobInfo := sqlExec.bm.TransResult(info.SpaceId, info.InstanceId, result)
 				if err := sqlExec.bm.UpsertResult(ctx, jobInfo); err != nil {
 					_ = session.Stop()
 				}
@@ -94,18 +94,19 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 	}
 }
 
-func (sqlExec *SqlExecutor) GetInfo(ctx context.Context, jobId string, flinkId string, spaceId string, clusterId string) (*flink.Job, error) {
-	return sqlExec.bm.GetJobInfo(ctx, jobId, flinkId, spaceId, clusterId)
+func (sqlExec *SqlExecutor) GetInfo(ctx context.Context, instanceId string, spaceId string, clusterId string) (*flink.Job, error) {
+	return sqlExec.bm.GetJobInfo(ctx, instanceId, spaceId, clusterId)
 }
 
-func (sqlExec *SqlExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
-	return sqlExec.bm.CancelJob(ctx, jobId, spaceId, clusterId)
+func (sqlExec *SqlExecutor) Cancel(ctx context.Context, instanceId string, spaceId string, clusterId string) error {
+	return sqlExec.bm.CancelJob(ctx, instanceId, spaceId, clusterId)
 }
 
-func (sqlExec *SqlExecutor) Validate(code string) (bool, string, error) {
+func (sqlExec *SqlExecutor) Validate(jobCode *model.StreamJobCode) (bool, string, error) {
 	builder := strings.Builder{}
-	builder.WriteString("java -jar /Users/apple/develop/java/sql-vadilator/target/sql-validator.jar ")
-	builder.WriteString(base64.StdEncoding.EncodeToString([]byte(code)))
+	builder.WriteString("java -jar /zeppelin/flink/depends/sql-validator.jar ")
+	//builder.WriteString("java -jar /Users/apple/develop/java/sql-vadilator/target/sql-validator.jar ")
+	builder.WriteString(base64.StdEncoding.EncodeToString([]byte(jobCode.Sql.Code)))
 	session := zeppelin.NewZSession(sqlExec.bm.zeppelinConfig, "sh")
 	if err := session.Start(); err != nil {
 		return false, "", err

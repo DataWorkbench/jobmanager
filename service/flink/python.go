@@ -24,7 +24,7 @@ func NewPythonExecutor(bm *BaseExecutor, ctx context.Context) *ScalaExecutor {
 	}
 }
 
-func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.JobInfo) (*zeppelin.ExecuteResult, error) {
+func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ExecuteResult, error) {
 	udfs, err := pyExec.bm.getUDFs(ctx, info.GetArgs().GetUdfs())
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.JobInfo) (*
 		}
 	}
 	jobProp := map[string]string{}
-	jobProp["jobName"] = info.GetJobId()
+	jobProp["jobName"] = info.GetInstanceId()
 	if info.GetArgs().GetParallelism() > 0 {
 		jobProp["parallelism"] = strconv.FormatInt(int64(info.GetArgs().GetParallelism()), 10)
 	}
@@ -66,7 +66,7 @@ func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.JobInfo) (*
 			if len(result.JobId) != 32 && (result.Status.IsRunning() || result.Status.IsPending()) {
 				_ = session.Stop()
 			} else {
-				jobInfo := pyExec.bm.TransResult(info.SpaceId, info.JobId, result)
+				jobInfo := pyExec.bm.TransResult(info.SpaceId, info.InstanceId, result)
 				if err := pyExec.bm.UpsertResult(ctx, jobInfo); err != nil {
 					_ = session.Stop()
 				}
@@ -91,14 +91,14 @@ func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.JobInfo) (*
 	}
 }
 
-func (pyExec *PythonExecutor) GetInfo(ctx context.Context, jobId string, jobName string, spaceId string, clusterId string) (*flink.Job, error) {
-	return pyExec.bm.GetJobInfo(ctx, jobId, jobName, spaceId, clusterId)
+func (pyExec *PythonExecutor) GetInfo(ctx context.Context, instanceId string, spaceId string, clusterId string) (*flink.Job, error) {
+	return pyExec.bm.GetJobInfo(ctx, instanceId, spaceId, clusterId)
 }
 
-func (pyExec *PythonExecutor) Cancel(ctx context.Context, jobId string, spaceId string, clusterId string) error {
-	return pyExec.bm.CancelJob(ctx, jobId, spaceId, clusterId)
+func (pyExec *PythonExecutor) Cancel(ctx context.Context, instanceId string, spaceId string, clusterId string) error {
+	return pyExec.bm.CancelJob(ctx, instanceId, spaceId, clusterId)
 }
 
-func (pyExec *PythonExecutor) Validate(code string) (bool, string, error) {
+func (pyExec *PythonExecutor) Validate(jobCode *model.StreamJobCode) (bool, string, error) {
 	return true, "", nil
 }

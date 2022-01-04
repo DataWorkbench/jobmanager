@@ -18,18 +18,18 @@ func NewJobManagerServer(service *service.JobManagerService) *JobManagerServer {
 	return &JobManagerServer{service: service}
 }
 
-func (s *JobManagerServer) RunJob(ctx context.Context, req *request.JobInfo) (*response.JobInfo, error) {
+func (s *JobManagerServer) RunJob(ctx context.Context, req *request.RunJob) (*response.RunJob, error) {
 	return s.service.RunFlinkJob(ctx, req)
 }
 
-func (s *JobManagerServer) GetJobInfo(ctx context.Context, req *request.JobMessage) (*response.JobInfo, error) {
-	return s.service.GetFlinkJob(ctx, req.GetType(), req.GetJobId(), req.GetFlinkId(), req.GetSpaceId(), req.GetSpaceId())
+func (s *JobManagerServer) GetJobInfo(ctx context.Context, req *request.GetJobInfo) (*response.GetJobInfo, error) {
+	return s.service.GetFlinkJob(ctx, req.GetType(), req.GetInstanceId(), req.GetSpaceId(), req.GetClusterId())
 }
 
-func (s *JobManagerServer) CancelJob(ctx context.Context, req *request.JobMessage) (*model.EmptyStruct, error) {
-	return &model.EmptyStruct{}, s.service.CancelFlinkJob(ctx, req.GetType(), req.GetFlinkId(), req.GetSpaceId(), req.GetClusterId())
+func (s *JobManagerServer) CancelJob(ctx context.Context, req *request.CancelJob) (*model.EmptyStruct, error) {
+	return &model.EmptyStruct{}, s.service.CancelFlinkJob(ctx, req.GetType(), req.GetInstanceId(), req.GetSpaceId(), req.GetClusterId())
 }
 
-func (s *JobManagerServer) Validate(ctx context.Context, req *request.JobValidate) (*response.JobValidate, error) {
-	return s.service.ValidateCode(req.Type, req.Code)
+func (s *JobManagerServer) Validate(ctx context.Context, req *request.ValidateJob) (*response.StreamJobCodeSyntax, error) {
+	return s.service.ValidateCode(req.Code)
 }
