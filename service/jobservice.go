@@ -25,6 +25,7 @@ func NewJobManagerService(ctx context.Context, db *gorm.DB, uClient utils.UdfCli
 	flinkBase := flinkService.NewBaseManager(ctx, db, logger, eClient, uClient, rClient, flinkConfig, zeppelinConfig)
 	return &JobManagerService{
 		ctx:            ctx,
+		logger:         logger,
 		flinkExecutors: createFlinkExecutor(ctx, flinkBase),
 	}
 }

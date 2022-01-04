@@ -126,7 +126,7 @@ func (bm *BaseExecutor) GetResult(ctx context.Context, instanceId string) (*mode
 
 func (bm *BaseExecutor) getConnectors(builtInConnectors []string, flinkVersion string) string {
 	var executeJars string
-	var connectorSet map[string]string
+	connectorSet := map[string]string{}
 	connectorJarMap := constants.FlinkConnectorJarMap[flinkVersion]
 	for _, connector := range builtInConnectors {
 		jars := connectorJarMap[connector]
@@ -134,12 +134,13 @@ func (bm *BaseExecutor) getConnectors(builtInConnectors []string, flinkVersion s
 			connectorSet[jar+","] = ""
 		}
 	}
-	for jar, _ := range connectorSet {
+	for jar := range connectorSet {
 		executeJars += jar
 	}
 	if executeJars != "" && len(executeJars) > 0 && strings.HasSuffix(executeJars, ",") {
 		executeJars = executeJars[:strings.LastIndex(executeJars, ",")-1]
 	}
+
 	return executeJars
 }
 
@@ -175,9 +176,7 @@ func (bm *BaseExecutor) getUDFJars(udfs []*Udf) string {
 			executionUdfJars += udf.code + ","
 		}
 	}
-	if strings.HasSuffix(executionUdfJars, ",") {
-		executionUdfJars = executionUdfJars[:len(executionUdfJars)-1]
-	}
+	executionUdfJars = strings.TrimSuffix(executionUdfJars, ",")
 	return executionUdfJars
 }
 
@@ -223,14 +222,14 @@ func (bm *BaseExecutor) GetJobInfo(ctx context.Context, instanceId string, space
 	flinkUrl := "127.0.0.1:8081"
 	result, err := bm.GetResult(ctx, instanceId)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// TODO 没有这条记录
-		}
+		//if errors.Is(err, gorm.ErrRecordNotFound) {
+		//	// TODO 没有这条记录
+		//}
 		return nil, err
 	}
-	if len(result.FlinkId) != 32 {
-		// TODO 记录下来
-	}
+	//if len(result.FlinkId) != 32 {
+	//	// TODO 记录下来
+	//}
 	return bm.flinkClient.GetJobInfoByJobId(flinkUrl, result.FlinkId)
 }
 
@@ -243,13 +242,13 @@ func (bm *BaseExecutor) CancelJob(ctx context.Context, instanceId string, spaceI
 	flinkUrl := "127.0.0.1:8081"
 	result, err := bm.GetResult(ctx, instanceId)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			//TODO 没有这条记录
-		}
+		//if errors.Is(err, gorm.ErrRecordNotFound) {
+		//	//TODO 没有这条记录
+		//}
 		return err
 	}
-	if len(result.FlinkId) != 32 {
-		// TODO 记录下来,返回失败
-	}
+	//if len(result.FlinkId) != 32 {
+	//	// TODO 记录下来,返回失败
+	//}
 	return bm.flinkClient.CancelJob(flinkUrl, result.FlinkId)
 }

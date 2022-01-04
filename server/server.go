@@ -63,17 +63,18 @@ func Start() (err error) {
 	if tracer, tracerCloser, err = gtrace.New(cfg.Tracer); err != nil {
 		return
 	}
+	ctx = gtrace.ContextWithTracer(ctx, tracer)
 
-	db, err = gormwrap.NewMySQLConn(ctx, cfg.MySQL, gormwrap.WithTracer(tracer))
+	db, err = gormwrap.NewMySQLConn(ctx, cfg.MySQL)
 	if err != nil {
 		return
 	}
 
-	if rpcServer, err = grpcwrap.NewServer(ctx, cfg.GRPCServer, grpcwrap.ServerWithTracer(tracer)); err != nil {
+	if rpcServer, err = grpcwrap.NewServer(ctx, cfg.GRPCServer); err != nil {
 		return
 	}
 
-	if engineConn, err = grpcwrap.NewConn(ctx, cfg.EngineManagerServer, grpcwrap.ClientWithTracer(tracer)); err != nil {
+	if engineConn, err = grpcwrap.NewConn(ctx, cfg.EngineManagerServer); err != nil {
 		return
 	}
 
@@ -81,7 +82,7 @@ func Start() (err error) {
 		return
 	}
 
-	if resourceConn, err = grpcwrap.NewConn(ctx, cfg.ResourceManagerServer, grpcwrap.ClientWithTracer(tracer)); err != nil {
+	if resourceConn, err = grpcwrap.NewConn(ctx, cfg.ResourceManagerServer); err != nil {
 		return
 	}
 
@@ -89,7 +90,7 @@ func Start() (err error) {
 		return
 	}
 
-	if udfConn, err = grpcwrap.NewConn(ctx, cfg.UdfManagerServer, grpcwrap.ClientWithTracer(tracer)); err != nil {
+	if udfConn, err = grpcwrap.NewConn(ctx, cfg.UdfManagerServer); err != nil {
 		return
 	}
 
