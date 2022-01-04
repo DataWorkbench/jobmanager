@@ -198,25 +198,12 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.J
 }
 
 func (bm *BaseExecutor) GetJobInfo(ctx context.Context, jobId string, flinkId string, spaceId string, clusterId string) (*flink.Job, error) {
-Retry:
-	if flinkId != "" && len(flinkId) == 32 {
-		//flinkUrl, _, err := bm.engineClient.GetEngineInfo(ctx, spaceId, clusterId)
-		//if err != nil {
-		//	return nil, err
-		//}
-		flinkUrl := "127.0.0.1:8081"
-		return bm.flinkClient.GetJobInfoByJobId(flinkUrl, flinkId)
-	} else {
-		jobInfo, err := bm.GetResult(ctx, jobId)
-		if err != nil {
-			return nil, err
-		}
-		if jobInfo.FlinkId != "" && len(jobInfo.FlinkId) == 32 {
-			flinkId = jobInfo.FlinkId
-			goto Retry
-		}
-		return nil, nil
-	}
+	//flinkUrl, _, err := bm.engineClient.GetEngineInfo(ctx, spaceId, clusterId)
+	//if err != nil {
+	//	return nil, err
+	//}
+	flinkUrl := "127.0.0.1:8081"
+	return bm.flinkClient.GetJobInfoByJobId(flinkUrl, flinkId)
 }
 
 func (bm *BaseExecutor) CancelJob(ctx context.Context, jobId string, spaceId string, clusterId string) error {

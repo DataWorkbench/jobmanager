@@ -62,13 +62,12 @@ func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.JobInfo) 
 		return nil, err
 	}
 	defer func() {
-		if result != nil && (len(result.Results) > 0 || len(result.JobUrls) > 0) {
-			if (result.Status.IsRunning() || result.Status.IsPending()) &&
-				result.JobUrls != nil && len(result.JobUrls) > 0 {
+		if result != nil && (len(result.Results) > 0 || len(result.JobId) == 32) {
+			if len(result.JobId) != 32 && (result.Status.IsRunning() || result.Status.IsPending()) {
 				_ = session.Stop()
 			} else {
 				jobInfo := scalaExec.bm.TransResult(info.SpaceId, info.JobId, result)
-				if err = scalaExec.bm.UpsertResult(ctx, jobInfo); err != nil {
+				if err := scalaExec.bm.UpsertResult(ctx, jobInfo); err != nil {
 					_ = session.Stop()
 				}
 			}
@@ -84,9 +83,7 @@ func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.JobInfo) 
 		if len(result.JobUrls) > 0 {
 			jobUrl := result.JobUrls[0]
 			if len(jobUrl)-1-strings.LastIndex(jobUrl, "/") == 32 {
-				jobId := jobUrl[strings.LastIndex(jobUrl, "/")+1:]
-				urls := []string{jobId}
-				result.JobUrls = urls
+				result.JobId = jobUrl[strings.LastIndex(jobUrl, "/")+1:]
 			}
 			return result, nil
 		}

@@ -53,18 +53,32 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.JobInfo) (*ze
 	if err = session.Start(); err != nil {
 		return nil, err
 	}
+
 	result, err := session.Exec(code)
 	if err != nil {
 		return nil, err
 	}
+
+	defer func() {
+		if result != nil && (len(result.Results) > 0 || len(result.JobId) == 32) {
+			if len(result.JobId) != 32 && (result.Status.IsRunning() || result.Status.IsPending()) {
+				_ = session.Stop()
+			} else {
+				jobInfo := jarExec.bm.TransResult(info.SpaceId, info.JobId, result)
+				if err := jarExec.bm.UpsertResult(ctx, jobInfo); err != nil {
+					_ = session.Stop()
+				}
+			}
+		}
+	}()
 	if result.Results != nil && len(result.Results) > 0 {
 		for _, re := range result.Results {
 			if strings.EqualFold(re.Type, "TEXT") {
-				jobInfo := strings.Split(re.Data, "JobID")
+				jobInfo := strings.Split(re.Data, "JobID ")
 				if len(jobInfo) == 2 {
-					jobId := strings.ReplaceAll(jobInfo[1], "\n", "")
-					if len(jobId) == 32 {
-						result.JobUrls = append(result.JobUrls, jobId)
+					if jobId := strings.ReplaceAll(jobInfo[1], "\n", ""); len(jobId) == 32 {
+						result.JobId = jobId
+						return result, nil
 					}
 				}
 			}
