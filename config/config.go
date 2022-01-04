@@ -2,11 +2,11 @@ package config
 
 import (
 	"fmt"
+	"github.com/DataWorkbench/common/gormwrap"
 	"io/ioutil"
 	"os"
 	"time"
 
-	"github.com/DataWorkbench/common/gormwrap"
 	"github.com/DataWorkbench/common/grpcwrap"
 	"github.com/DataWorkbench/common/gtrace"
 	"github.com/DataWorkbench/common/metrics"
@@ -24,15 +24,15 @@ const (
 
 // Config is the configuration settings for spacemanager
 type Config struct {
-	LogLevel            int8                   `json:"log_level"      yaml:"log_level"      env:"LOG_LEVEL" validate:"gte=1,lte=5"`
-	ZeppelinAddress     string                 `json:"zeppelin_address"      yaml:"zeppelin_address"      env:"ZEPPELIN_ADDRESS" validate:"required"`
-	JobDeveloperServer  *grpcwrap.ClientConfig `json:"jobdeveloper_server"      yaml:"jobdeveloper_server"      env:"JOBDEVELOPER_SERVER" validate:"required"`
-	EngineManagerServer *grpcwrap.ClientConfig `json:"enginemanager_server"      yaml:"enginemanager_server"      env:"ENGINEMANAGER_SERVER" validate:"required"`
-	JobWatcherServer    *grpcwrap.ClientConfig `json:"jobwatcher_server"      yaml:"jobwatcher_server"      env:"JOBWATCHER_SERVER" validate:"required"`
-	GRPCServer          *grpcwrap.ServerConfig `json:"grpc_server"    yaml:"grpc_server"    env:"GRPC_SERVER"         validate:"required"`
-	MetricsServer       *metrics.Config        `json:"metrics_server" yaml:"metrics_server" env:"METRICS_SERVER"      validate:"required"`
-	MySQL               *gormwrap.MySQLConfig  `json:"mysql"          yaml:"mysql"          env:"MYSQL"               validate:"required"`
-	Tracer              *gtrace.Config         `json:"tracer"         yaml:"tracer"         env:"TRACER"              validate:"required"`
+	LogLevel              int8                   `json:"log_level"      yaml:"log_level"      env:"LOG_LEVEL" validate:"gte=1,lte=5"`
+	ZeppelinAddress       string                 `json:"zeppelin_address"      yaml:"zeppelin_address"      env:"ZEPPELIN_ADDRESS" validate:"required"`
+	ResourceManagerServer *grpcwrap.ClientConfig `json:"resourcemanager_server"      yaml:"resourcemanager_server"      env:"RESOURCEMANAGER_SERVER" validate:"required"`
+	EngineManagerServer   *grpcwrap.ClientConfig `json:"enginemanager_server"      yaml:"enginemanager_server"      env:"ENGINEMANAGER_SERVER" validate:"required"`
+	UdfManagerServer      *grpcwrap.ClientConfig `json:"udfmanager_server"      yaml:"udfmanager_server"      env:"UDFMANAGER_SERVER" validate:"required"`
+	GRPCServer            *grpcwrap.ServerConfig `json:"grpc_server"    yaml:"grpc_server"    env:"GRPC_SERVER"         validate:"required"`
+	MetricsServer         *metrics.Config        `json:"metrics_server" yaml:"metrics_server" env:"METRICS_SERVER"      validate:"required"`
+	MySQL                 *gormwrap.MySQLConfig  `json:"mysql"          yaml:"mysql"          env:"MYSQL"               validate:"required"`
+	Tracer                *gtrace.Config         `json:"tracer"         yaml:"tracer"         env:"TRACER"              validate:"required"`
 }
 
 func loadFromFile(cfg *Config) (err error) {
