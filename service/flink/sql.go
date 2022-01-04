@@ -13,27 +13,27 @@ import (
 )
 
 type SqlExecutor struct {
-	bm  *BaseExecutor
+	*BaseExecutor
 	ctx context.Context
 }
 
 func NewSqlExecutor(ctx context.Context, bm *BaseExecutor) *SqlExecutor {
 	return &SqlExecutor{
-		bm:  bm,
-		ctx: ctx,
+		BaseExecutor: bm,
+		ctx:          ctx,
 	}
 }
 
 func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ExecuteResult, error) {
-	udfs, err := sqlExec.bm.getUDFs(ctx, info.GetArgs().GetUdfs())
+	udfs, err := sqlExec.getUDFs(ctx, info.GetArgs().GetUdfs())
 	if err != nil {
 		return nil, err
 	}
-	properties, err := sqlExec.bm.getGlobalProperties(ctx, info, udfs)
+	properties, err := sqlExec.getGlobalProperties(ctx, info, udfs)
 	if err != nil {
 		return nil, err
 	}
-	session := zeppelin.NewZSessionWithProperties(sqlExec.bm.zeppelinConfig, FLINK, properties)
+	session := zeppelin.NewZSessionWithProperties(sqlExec.zeppelinConfig, FLINK, properties)
 	if err = session.Start(); err != nil {
 		return nil, err
 	}
@@ -63,18 +63,10 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	if result, err = session.SubmitWithProperties("ssql", jobProp, info.GetCode().Sql.Code); err != nil {
 		return result, err
 	}
+
 	// TODO if execute with batch type ssql waitUntilFinished
 	defer func() {
-		if result != nil && (len(result.Results) > 0 || len(result.JobId) == 32) {
-			if len(result.JobId) != 32 && (result.Status.IsRunning() || result.Status.IsPending()) {
-				_ = session.Stop()
-			} else {
-				jobInfo := sqlExec.bm.TransResult(info.SpaceId, info.InstanceId, result)
-				if err := sqlExec.bm.UpsertResult(ctx, jobInfo); err != nil {
-					_ = session.Stop()
-				}
-			}
-		}
+		sqlExec.HandleResults(ctx, info.SpaceId, info.InstanceId, result, session)
 	}()
 	for {
 		if result, err = session.QueryStatement(result.StatementId); err != nil {
@@ -95,11 +87,11 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 }
 
 func (sqlExec *SqlExecutor) GetInfo(ctx context.Context, instanceId string, spaceId string, clusterId string) (*flink.Job, error) {
-	return sqlExec.bm.GetJobInfo(ctx, instanceId, spaceId, clusterId)
+	return sqlExec.GetJobInfo(ctx, instanceId, spaceId, clusterId)
 }
 
 func (sqlExec *SqlExecutor) Cancel(ctx context.Context, instanceId string, spaceId string, clusterId string) error {
-	return sqlExec.bm.CancelJob(ctx, instanceId, spaceId, clusterId)
+	return sqlExec.CancelJob(ctx, instanceId, spaceId, clusterId)
 }
 
 func (sqlExec *SqlExecutor) Validate(jobCode *model.StreamJobCode) (bool, string, error) {
@@ -107,7 +99,7 @@ func (sqlExec *SqlExecutor) Validate(jobCode *model.StreamJobCode) (bool, string
 	builder.WriteString("java -jar /zeppelin/flink/depends/sql-validator.jar ")
 	//builder.WriteString("java -jar /Users/apple/develop/java/sql-vadilator/target/sql-validator.jar ")
 	builder.WriteString(base64.StdEncoding.EncodeToString([]byte(jobCode.Sql.Code)))
-	session := zeppelin.NewZSession(sqlExec.bm.zeppelinConfig, "sh")
+	session := zeppelin.NewZSession(sqlExec.zeppelinConfig, "sh")
 	if err := session.Start(); err != nil {
 		return false, "", err
 	}

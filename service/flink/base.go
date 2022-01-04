@@ -59,46 +59,63 @@ func NewBaseManager(ctx context.Context, db *gorm.DB, logger *glog.Logger, engin
 	}
 }
 
-func (bm *BaseExecutor) TransResult(spaceId string, jobId string, executeResult *zeppelin.ExecuteResult) *model.JobInfo {
+func TransResult(result *zeppelin.ExecuteResult) (string, model.StreamJobInst_State) {
 	var data string
-	for _, re := range executeResult.Results {
+	var status model.StreamJobInst_State
+	for _, re := range result.Results {
 		if strings.EqualFold("TEXT", re.Type) {
 			data = re.Data
 		}
 	}
-	jobInfo := model.JobInfo{
-		SpaceId:     spaceId,
-		JobId:       jobId,
-		NoteId:      executeResult.SessionInfo.NoteId,
-		SessionId:   executeResult.SessionInfo.SessionId,
-		StatementId: executeResult.StatementId,
-		Data:        data,
-	}
-	switch executeResult.Status {
+	switch result.Status {
+	case zeppelin.RUNNING:
+		status = model.StreamJobInst_Running
+	case zeppelin.ABORT, zeppelin.FINISHED:
+		status = model.StreamJobInst_Succeed
 	case zeppelin.ERROR:
-		jobInfo.Status = model.JobInfo_Failed
-	case zeppelin.ABORT:
-		jobInfo.Status = model.JobInfo_Suspended
-	case zeppelin.FINISHED:
-		jobInfo.Status = model.JobInfo_Finished
-	default:
-		jobInfo.Status = model.JobInfo_Initializing
+		status = model.StreamJobInst_Failed
 	}
-	return &jobInfo
+	return data, status
+}
+
+func (bm *BaseExecutor) HandleResults(ctx context.Context, spaceId string, instanceId string,
+	result *zeppelin.ExecuteResult, session *zeppelin.ZSession) {
+	if result != nil && (len(result.Results) > 0 || len(result.JobId) == 32) {
+		if len(result.JobId) != 32 && (result.Status.IsRunning() || result.Status.IsPending()) {
+			_ = session.Stop()
+			result.Status = zeppelin.ABORT
+		} else {
+			data, state := TransResult(result)
+			jobInfo := model.JobInfo{
+				SpaceId:     spaceId,
+				InstanceId:  instanceId,
+				NoteId:      result.SessionInfo.NoteId,
+				SessionId:   result.SessionInfo.SessionId,
+				StatementId: result.StatementId,
+				FlinkId:     result.JobId,
+				Message:     data,
+				State:       state,
+			}
+			if err := bm.UpsertResult(ctx, &jobInfo); err != nil {
+				_ = session.Stop()
+				result.Status = zeppelin.ABORT
+			}
+		}
+	}
 }
 
 func (bm *BaseExecutor) UpsertResult(ctx context.Context, jobInfo *model.JobInfo) error {
 	db := bm.db.WithContext(ctx)
 	return db.Table(JobManager).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "job_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"session_id", "statement_id", "flink_id", "status", "data"}),
+		Columns:   []clause.Column{{Name: "instance_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"session_id", "statement_id", "flink_id", "state", "message"}),
 	}).Create(jobInfo).Error
 }
 
 func (bm *BaseExecutor) GetResult(ctx context.Context, instanceId string) (*model.JobInfo, error) {
 	var jobInfo model.JobInfo
 	db := bm.db.WithContext(ctx)
-	if err := db.Table(JobManager).Clauses(clause.Locking{Strength: "UPDATE"}).Where("job_id", instanceId).First(&jobInfo).Error; err != nil {
+	if err := db.Table(JobManager).Clauses(clause.Locking{Strength: "UPDATE"}).Where("instance_id", instanceId).First(&jobInfo).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			err = qerror.ResourceNotExists.Format(instanceId)
 		}

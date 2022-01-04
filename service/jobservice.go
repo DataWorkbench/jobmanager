@@ -2,9 +2,6 @@ package service
 
 import (
 	"context"
-	"gorm.io/gorm"
-	"strings"
-
 	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/zeppelin"
 	"github.com/DataWorkbench/glog"
@@ -13,6 +10,7 @@ import (
 	"github.com/DataWorkbench/gproto/pkg/response"
 	flinkService "github.com/DataWorkbench/jobmanager/service/flink"
 	"github.com/DataWorkbench/jobmanager/utils"
+	"gorm.io/gorm"
 )
 
 type JobManagerService struct {
@@ -39,20 +37,9 @@ func (jm *JobManagerService) RunFlinkJob(ctx context.Context, jobInfo *request.R
 	if err != nil {
 		return nil, err
 	}
-
-	switch result.Status {
-	case zeppelin.RUNNING:
-		res.State = model.StreamJobInst_Running
-	case zeppelin.ABORT, zeppelin.FINISHED:
-		res.State = model.StreamJobInst_Succeed
-	case zeppelin.ERROR:
-		res.State = model.StreamJobInst_Failed
-	}
-	for _, r := range result.Results {
-		if strings.EqualFold("TEXT", r.Type) {
-			res.Message = r.Data
-		}
-	}
+	data, state := flinkService.TransResult(result)
+	res.Message = data
+	res.State = state
 	return &res, nil
 }
 

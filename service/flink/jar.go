@@ -12,14 +12,14 @@ import (
 )
 
 type JarExecutor struct {
-	bm  *BaseExecutor
+	*BaseExecutor
 	ctx context.Context
 }
 
 func NewJarExecutor(bm *BaseExecutor, ctx context.Context) *JarExecutor {
 	return &JarExecutor{
-		bm:  bm,
-		ctx: ctx,
+		BaseExecutor: bm,
+		ctx:          ctx,
 	}
 }
 
@@ -29,18 +29,35 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	properties["shell.command.timeout.millisecs"] = "30000"
 	//flinkHome := "/zeppelin/flink/flink-1.12.3/"
 	flinkHome := "/Users/apple/develop/bigdata/flink-1.12.5"
-	flinkUrl, _, err := jarExec.bm.engineClient.GetEngineInfo(ctx, info.GetSpaceId(), info.GetArgs().GetClusterId())
+	flinkUrl, _, err := jarExec.engineClient.GetEngineInfo(ctx, info.GetSpaceId(), info.GetArgs().GetClusterId())
 	if err != nil {
 		return nil, err
 	}
-	jarName, jarUrl, err := jarExec.bm.resourceClient.GetFileById(ctx, jar.ResourceId)
+
+	jarName, jarUrl, err := jarExec.resourceClient.GetFileById(ctx, jar.ResourceId)
 	if err != nil {
 		return nil, err
 	}
 	localJarPath := "/tmp/" + jarName
+
+	udfs, err := jarExec.getUDFs(ctx, info.GetArgs().GetUdfs())
+	if err != nil {
+		return nil, err
+	}
+	jars := jarExec.getUDFJars(udfs)
+
 	builder := strings.Builder{}
 	builder.WriteString(fmt.Sprintf("hdfs dfs -get %v %v\n", jarUrl, localJarPath))
+	var udfJars []string
+	for index, udf := range jars {
+		var src = fmt.Sprintf("/tmp/%d.jar", index+1)
+		udfJars = append(udfJars, src)
+		builder.WriteString(fmt.Sprintf("hdfs dfs -get %v %v\n", udf, src))
+	}
 	builder.WriteString(fmt.Sprintf("%s/bin/flink run -d -m %s", flinkHome, flinkUrl))
+	for _, udf := range udfJars {
+		builder.WriteString(fmt.Sprintf(" -C %s", udf))
+	}
 	if info.GetArgs().GetParallelism() > 0 {
 		builder.WriteString(fmt.Sprintf(" -p %d", info.GetArgs().GetParallelism()))
 	}
@@ -50,7 +67,7 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	builder.WriteString(fmt.Sprintf(" %s %s", localJarPath, jar.GetJarArgs()))
 	code := builder.String()
 
-	session := zeppelin.NewZSessionWithProperties(jarExec.bm.zeppelinConfig, SHELL, properties)
+	session := zeppelin.NewZSessionWithProperties(jarExec.zeppelinConfig, SHELL, properties)
 	if err = session.Start(); err != nil {
 		return nil, err
 	}
@@ -61,16 +78,7 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	}
 
 	defer func() {
-		if result != nil && (len(result.Results) > 0 || len(result.JobId) == 32) {
-			if len(result.JobId) != 32 && (result.Status.IsRunning() || result.Status.IsPending()) {
-				_ = session.Stop()
-			} else {
-				jobInfo := jarExec.bm.TransResult(info.SpaceId, info.InstanceId, result)
-				if err := jarExec.bm.UpsertResult(ctx, jobInfo); err != nil {
-					_ = session.Stop()
-				}
-			}
-		}
+		jarExec.HandleResults(ctx, info.SpaceId, info.InstanceId, result, session)
 	}()
 	if result.Results != nil && len(result.Results) > 0 {
 		for _, re := range result.Results {
@@ -89,11 +97,11 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 }
 
 func (jarExec *JarExecutor) GetInfo(ctx context.Context, instanceId string, spaceId string, clusterId string) (*flink.Job, error) {
-	return jarExec.bm.GetJobInfo(ctx, instanceId, spaceId, clusterId)
+	return jarExec.GetJobInfo(ctx, instanceId, spaceId, clusterId)
 }
 
 func (jarExec *JarExecutor) Cancel(ctx context.Context, instanceId string, spaceId string, clusterId string) error {
-	return jarExec.bm.CancelJob(ctx, instanceId, spaceId, clusterId)
+	return jarExec.CancelJob(ctx, instanceId, spaceId, clusterId)
 }
 
 func (jarExec *JarExecutor) Validate(jobCode *model.StreamJobCode) (bool, string, error) {

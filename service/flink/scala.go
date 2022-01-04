@@ -13,27 +13,27 @@ import (
 )
 
 type ScalaExecutor struct {
-	bm  *BaseExecutor
+	*BaseExecutor
 	ctx context.Context
 }
 
 func NewScalaExecutor(bm *BaseExecutor, ctx context.Context) *ScalaExecutor {
 	return &ScalaExecutor{
-		bm:  bm,
-		ctx: ctx,
+		BaseExecutor: bm,
+		ctx:          ctx,
 	}
 }
 
 func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ExecuteResult, error) {
-	udfs, err := scalaExec.bm.getUDFs(ctx, info.GetArgs().GetUdfs())
+	udfs, err := scalaExec.getUDFs(ctx, info.GetArgs().GetUdfs())
 	if err != nil {
 		return nil, err
 	}
-	properties, err := scalaExec.bm.getGlobalProperties(ctx, info, udfs)
+	properties, err := scalaExec.getGlobalProperties(ctx, info, udfs)
 	if err != nil {
 		return nil, err
 	}
-	session := zeppelin.NewZSessionWithProperties(scalaExec.bm.zeppelinConfig, FLINK, properties)
+	session := zeppelin.NewZSessionWithProperties(scalaExec.zeppelinConfig, FLINK, properties)
 	if err = session.Start(); err != nil {
 		return nil, err
 	}
@@ -61,17 +61,9 @@ func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.RunJob) (
 	if result, err = session.SubmitWithProperties("", jobProp, info.GetCode().Scala.Code); err != nil {
 		return nil, err
 	}
+
 	defer func() {
-		if result != nil && (len(result.Results) > 0 || len(result.JobId) == 32) {
-			if len(result.JobId) != 32 && (result.Status.IsRunning() || result.Status.IsPending()) {
-				_ = session.Stop()
-			} else {
-				jobInfo := scalaExec.bm.TransResult(info.SpaceId, info.InstanceId, result)
-				if err := scalaExec.bm.UpsertResult(ctx, jobInfo); err != nil {
-					_ = session.Stop()
-				}
-			}
-		}
+		scalaExec.HandleResults(ctx, info.SpaceId, info.InstanceId, result, session)
 	}()
 	for {
 		if result, err = session.QueryStatement(result.StatementId); err != nil {
@@ -92,11 +84,11 @@ func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.RunJob) (
 }
 
 func (scalaExec *ScalaExecutor) GetInfo(ctx context.Context, instanceId string, spaceId string, clusterId string) (*flink.Job, error) {
-	return scalaExec.bm.GetJobInfo(ctx, instanceId, spaceId, clusterId)
+	return scalaExec.GetJobInfo(ctx, instanceId, spaceId, clusterId)
 }
 
 func (scalaExec *ScalaExecutor) Cancel(ctx context.Context, instanceId string, spaceId string, clusterId string) error {
-	return scalaExec.bm.CancelJob(ctx, instanceId, spaceId, clusterId)
+	return scalaExec.CancelJob(ctx, instanceId, spaceId, clusterId)
 }
 
 func (scalaExec *ScalaExecutor) Validate(jobCode *model.StreamJobCode) (bool, string, error) {

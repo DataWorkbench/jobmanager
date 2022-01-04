@@ -13,27 +13,27 @@ import (
 )
 
 type PythonExecutor struct {
-	bm  *BaseExecutor
+	*BaseExecutor
 	ctx context.Context
 }
 
-func NewPythonExecutor(bm *BaseExecutor, ctx context.Context) *ScalaExecutor {
-	return &ScalaExecutor{
-		bm:  bm,
-		ctx: ctx,
+func NewPythonExecutor(bm *BaseExecutor, ctx context.Context) *PythonExecutor {
+	return &PythonExecutor{
+		BaseExecutor: bm,
+		ctx:          ctx,
 	}
 }
 
 func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ExecuteResult, error) {
-	udfs, err := pyExec.bm.getUDFs(ctx, info.GetArgs().GetUdfs())
+	udfs, err := pyExec.getUDFs(ctx, info.GetArgs().GetUdfs())
 	if err != nil {
 		return nil, err
 	}
-	properties, err := pyExec.bm.getGlobalProperties(ctx, info, udfs)
+	properties, err := pyExec.getGlobalProperties(ctx, info, udfs)
 	if err != nil {
 		return nil, err
 	}
-	session := zeppelin.NewZSessionWithProperties(pyExec.bm.zeppelinConfig, FLINK, properties)
+	session := zeppelin.NewZSessionWithProperties(pyExec.zeppelinConfig, FLINK, properties)
 	if err = session.Start(); err != nil {
 		return nil, err
 	}
@@ -61,17 +61,9 @@ func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.RunJob) (*z
 	if result, err = session.SubmitWithProperties("ipyflink", jobProp, info.GetCode().Scala.Code); err != nil {
 		return result, err
 	}
+
 	defer func() {
-		if result != nil && (len(result.Results) > 0 || len(result.JobId) == 32) {
-			if len(result.JobId) != 32 && (result.Status.IsRunning() || result.Status.IsPending()) {
-				_ = session.Stop()
-			} else {
-				jobInfo := pyExec.bm.TransResult(info.SpaceId, info.InstanceId, result)
-				if err := pyExec.bm.UpsertResult(ctx, jobInfo); err != nil {
-					_ = session.Stop()
-				}
-			}
-		}
+		pyExec.HandleResults(ctx, info.SpaceId, info.InstanceId, result, session)
 	}()
 	for {
 		if result, err = session.QueryStatement(result.StatementId); err != nil {
@@ -92,11 +84,11 @@ func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.RunJob) (*z
 }
 
 func (pyExec *PythonExecutor) GetInfo(ctx context.Context, instanceId string, spaceId string, clusterId string) (*flink.Job, error) {
-	return pyExec.bm.GetJobInfo(ctx, instanceId, spaceId, clusterId)
+	return pyExec.GetJobInfo(ctx, instanceId, spaceId, clusterId)
 }
 
 func (pyExec *PythonExecutor) Cancel(ctx context.Context, instanceId string, spaceId string, clusterId string) error {
-	return pyExec.bm.CancelJob(ctx, instanceId, spaceId, clusterId)
+	return pyExec.CancelJob(ctx, instanceId, spaceId, clusterId)
 }
 
 func (pyExec *PythonExecutor) Validate(jobCode *model.StreamJobCode) (bool, string, error) {
