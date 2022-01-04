@@ -55,8 +55,8 @@ func (jm *JobManagerService) RunFlinkJob(ctx context.Context, jobInfo *request.J
 			res.Data = r.Data
 		}
 	}
-	if len(result.JobUrls) > 0 && result.JobUrls[0] != "" && len(result.JobUrls[0]) == 32 {
-		res.JobId = result.JobUrls[0]
+	if len(result.JobId) == 32 {
+		return jm.GetFlinkJob(ctx, jobInfo.Code.Type, jobInfo.JobId, result.JobId, jobInfo.SpaceId, jobInfo.Args.ClusterId)
 	}
 	return &res, nil
 }
@@ -75,6 +75,16 @@ func (jm *JobManagerService) GetFlinkJob(ctx context.Context, jobType model.Stre
 		return nil, err
 	}
 	res.JobId = job.Jid
+	switch job.State {
+	case "FAILED":
+		res.State = model.StreamJobInst_Failed
+	case "FAILING", "INITIALIZING", "RESTARTING", "RECONCILING", "CANCELLING":
+		res.State = model.StreamJobInst_Pending
+	case "CREATED", "FINISHED", "CANCELED", "SUSPENDED":
+		res.State = model.StreamJobInst_Succeed
+	case "RUNNING":
+		res.State = model.StreamJobInst_Running
+	}
 	return &res, nil
 }
 

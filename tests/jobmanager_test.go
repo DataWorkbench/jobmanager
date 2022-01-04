@@ -29,7 +29,7 @@ func init() {
 	client = jobpb.NewJobmanagerClient(conn)
 }
 
-func Test_Run(t *testing.T) {
+func Test_RunSql(t *testing.T) {
 	args := model.StreamJobArgs{
 		ClusterId:         "cfi-05636e792cfe5000",
 		Parallelism:       0,
