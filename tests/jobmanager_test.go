@@ -69,6 +69,36 @@ func Test_RunSql(t *testing.T) {
 	fmt.Println(job)
 }
 
+func Test_RunScala(t *testing.T) {
+	args := model.StreamJobArgs{
+		ClusterId:         clusterId,
+		Parallelism:       1,
+		Udfs:              nil,
+		Connectors:        nil,
+		BuiltInConnectors: nil,
+	}
+	jobType := model.StreamJob_Scala
+	scala := flinkpb.FlinkScala{Code: "val data = benv.fromElements(\"hello world\", \"hello flink\", \"hello hadoop\")\ndata.flatMap(line => line.split(\"\\\\s\"))\n             .map(w => (w, 1))\n             .groupBy(0)\n             .sum(1)\n             .print()"}
+	code := model.StreamJobCode{
+		Type:      jobType,
+		Operators: nil,
+		Sql:       nil,
+		Jar:       nil,
+		Scala:     &scala,
+		Python:    nil,
+	}
+	req := request.RunJob{
+		InstanceId:    instanceId,
+		SpaceId:       spaceId,
+		Args:          &args,
+		Code:          &code,
+		SavepointPath: "",
+	}
+	job, err := client.RunJob(ctx, &req)
+	require.Nil(t, err)
+	fmt.Println(job)
+}
+
 func Test_Validate(t *testing.T) {
 	var code = "create table if not exists datagen(id int,name string);" +
 		"create table if not exists print(id int,name string);" +

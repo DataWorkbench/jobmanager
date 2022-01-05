@@ -62,13 +62,14 @@ func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.RunJob) (
 	if info.GetArgs().GetParallelism() > 0 {
 		jobProp["parallelism"] = strconv.FormatInt(int64(info.GetArgs().GetParallelism()), 10)
 	}
-	if err = scalaExec.PreHandle(ctx, info.SpaceId, info.InstanceId, result); err != nil {
-		return nil, err
-	}
+
 	if result, err = session.SubmitWithProperties("", jobProp, info.GetCode().Scala.Code); err != nil {
 		return nil, err
 	}
 
+	if err = scalaExec.PreHandle(ctx, info.SpaceId, info.InstanceId, result); err != nil {
+		return nil, err
+	}
 	defer func() {
 		scalaExec.PostHandle(ctx, info.SpaceId, info.InstanceId, result, session)
 	}()

@@ -2,7 +2,7 @@
 
 # 1=>"debug", 2=>"info", 3=>"warn", 4=>"error", 5=>"fatal"
 log_level: 1
-zeppelin_address: "http://127.0.0.1:8080"
+zeppelin_address: "127.0.0.1:8080"
 
 enginemanager_server:
   address: "127.0.0.1:9114"  # required
