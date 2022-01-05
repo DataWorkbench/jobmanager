@@ -220,7 +220,7 @@ func (bm *BaseExecutor) getUDFJars(udfs []*Udf) string {
 
 func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.RunJob, udfs []*Udf) (map[string]string, error) {
 	properties := map[string]string{}
-	properties["FLINK_HOME"] = "/Users/apple/develop/bigdata/flink-1.12.5"
+	properties["FLINK_HOME"] = "/zeppelin/flink/flink-1.12.3"
 
 	flinkUrl, flinkVersion, err := bm.engineClient.GetEngineInfo(ctx, info.GetSpaceId(), info.GetArgs().GetClusterId())
 	if err != nil {
