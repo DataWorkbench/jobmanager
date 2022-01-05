@@ -30,6 +30,6 @@ func (s *JobManagerServer) CancelJob(ctx context.Context, req *request.CancelJob
 	return &model.EmptyStruct{}, s.service.CancelFlinkJob(ctx, req.GetType(), req.GetInstanceId(), req.GetSpaceId(), req.GetClusterId())
 }
 
-func (s *JobManagerServer) Validate(ctx context.Context, req *request.ValidateJob) (*response.StreamJobCodeSyntax, error) {
+func (s *JobManagerServer) ValidateJob(ctx context.Context, req *request.ValidateJob) (*response.StreamJobCodeSyntax, error) {
 	return s.service.ValidateCode(req.Code)
 }

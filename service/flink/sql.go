@@ -96,10 +96,13 @@ func (sqlExec *SqlExecutor) Cancel(ctx context.Context, instanceId string, space
 
 func (sqlExec *SqlExecutor) Validate(jobCode *model.StreamJobCode) (bool, string, error) {
 	builder := strings.Builder{}
-	builder.WriteString("java -jar /zeppelin/flink/depends/sql-validator.jar ")
-	//builder.WriteString("java -jar /Users/apple/develop/java/sql-vadilator/target/sql-validator.jar ")
+	//builder.WriteString("java -jar /zeppelin/flink/depends/sql-validator.jar ")
+	builder.WriteString("java -jar /Users/apple/develop/java/sql-vadilator/target/sql-validator.jar ")
 	builder.WriteString(base64.StdEncoding.EncodeToString([]byte(jobCode.Sql.Code)))
 	session := zeppelin.NewZSession(sqlExec.zeppelinConfig, "sh")
+	defer func() {
+		_ = session.Stop()
+	}()
 	if err := session.Start(); err != nil {
 		return false, "", err
 	}

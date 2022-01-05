@@ -70,13 +70,23 @@ func Test_RunSql(t *testing.T) {
 }
 
 func Test_Validate(t *testing.T) {
-	//var code = "create table if not exists datagen(id int,name string);" +
-	//	"create table if not exists print(,id int,name string);" +
-	//	"insert into print select * from datagen;"
-	//req := request.ValidateJob{Code: code}
-	//res, err := client.ValidateJob(ctx, &req)
-	//require.Nil(t, err)
-	//fmt.Println(res.Flag, res.Message)
+	var code = "create table if not exists datagen(id int,name string);" +
+		"create table if not exists print(id int,name string);" +
+		"insert into print select * from datagen;"
+
+	sql := flinkpb.FlinkSQL{Code: code}
+	jobCode := model.StreamJobCode{
+		Type:      model.StreamJob_SQL,
+		Operators: nil,
+		Sql:       &sql,
+		Jar:       nil,
+		Scala:     nil,
+		Python:    nil,
+	}
+	req := request.ValidateJob{Code: &jobCode}
+	res, err := client.ValidateJob(ctx, &req)
+	require.Nil(t, err)
+	fmt.Println(res.Message)
 }
 
 func Test_GetInfo(t *testing.T) {
