@@ -228,6 +228,7 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.R
 	}
 	host := flinkUrl[:strings.Index(flinkUrl, ":")]
 	port := flinkUrl[strings.Index(flinkUrl, ":")+1:]
+	properties["flink.execution.mode"] = "remote"
 	if host != "" && len(host) > 0 && port != "" && len(port) > 0 {
 		properties["flink.execution.remote.host"] = host
 		properties["flink.execution.remote.port"] = port
@@ -235,7 +236,6 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.R
 		return nil, qerror.ParseEngineFlinkUrlFailed.Format(flinkUrl)
 	}
 
-	properties["flink.execution.mode"] = "remote"
 	//properties["flink.execution.remote.host"] = "127.0.0.1"
 	//properties["flink.execution.remote.port"] = "8081"
 	//flinkVersion := "flink-1.12.3-scala_2.11"
