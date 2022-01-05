@@ -275,17 +275,15 @@ func (bm *BaseExecutor) CancelJob(ctx context.Context, instanceId string, spaceI
 	//flinkUrl := "127.0.0.1:8081"
 	flinkUrl, _, err := bm.engineClient.GetEngineInfo(ctx, spaceId, clusterId)
 	if err != nil {
-		if errors.Is(err, qerror.ResourceNotExists) {
-			return nil
-		}
 		return err
 	}
 
 	result, err := bm.GetResult(ctx, instanceId)
 	if err != nil {
-		//if errors.Is(err, gorm.ErrRecordNotFound) {
-		//	//TODO 没有这条记录
-		//}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			//TODO 没有这条记录
+			return nil
+		}
 		return err
 	}
 	//if len(result.FlinkId) != 32 {
