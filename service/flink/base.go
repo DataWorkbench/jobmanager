@@ -221,26 +221,26 @@ func (bm *BaseExecutor) getUDFJars(udfs []*Udf) string {
 
 func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.RunJob, udfs []*Udf) (map[string]string, error) {
 	properties := map[string]string{}
-	//properties["FLINK_HOME"] = "/zeppelin/flink/flink-1.12.3"
+	properties["FLINK_HOME"] = "/zeppelin/flink/flink-1.12.3"
 
-	//flinkUrl, flinkVersion, err := bm.engineClient.GetEngineInfo(ctx, info.GetSpaceId(), info.GetArgs().GetClusterId())
-	//if err != nil {
-	//	return nil, err
-	//}
-	//host := flinkUrl[:strings.Index(flinkUrl, ":")]
-	//port := flinkUrl[strings.Index(flinkUrl, ":")+1:]
+	flinkUrl, flinkVersion, err := bm.engineClient.GetEngineInfo(ctx, info.GetSpaceId(), info.GetArgs().GetClusterId())
+	if err != nil {
+		return nil, err
+	}
+	host := flinkUrl[:strings.Index(flinkUrl, ":")]
+	port := flinkUrl[strings.Index(flinkUrl, ":")+1:]
 	properties["flink.execution.mode"] = "remote"
-	//if host != "" && len(host) > 0 && port != "" && len(port) > 0 {
-	//	properties["flink.execution.remote.host"] = host
-	//	properties["flink.execution.remote.port"] = port
-	//} else {
-	//	return nil, qerror.ParseEngineFlinkUrlFailed.Format(flinkUrl)
-	//}
+	if host != "" && len(host) > 0 && port != "" && len(port) > 0 {
+		properties["flink.execution.remote.host"] = host
+		properties["flink.execution.remote.port"] = port
+	} else {
+		return nil, qerror.ParseEngineFlinkUrlFailed.Format(flinkUrl)
+	}
 
-	properties["FLINK_HOME"] = "/Users/apple/develop/bigdata/flink-1.12.5"
-	properties["flink.execution.remote.host"] = "127.0.0.1"
-	properties["flink.execution.remote.port"] = "8081"
-	flinkVersion := "flink-1.12.3-scala_2.11"
+	//properties["FLINK_HOME"] = "/Users/apple/develop/bigdata/flink-1.12.5"
+	//properties["flink.execution.remote.host"] = "127.0.0.1"
+	//properties["flink.execution.remote.port"] = "8081"
+	//flinkVersion := "flink-1.12.3-scala_2.11"
 
 	executionJars := bm.getConnectors(info.GetArgs().GetBuiltInConnectors(), flinkVersion)
 	if executionJars != "" && len(executionJars) > 0 {
