@@ -25,6 +25,12 @@ func NewScalaExecutor(bm *BaseExecutor, ctx context.Context) *ScalaExecutor {
 }
 
 func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ExecuteResult, error) {
+	//if result, err := scalaExec.PreConn(ctx, info.InstanceId); err != nil {
+	//	return nil, err
+	//} else if result != nil {
+	//	return result, nil
+	//}
+
 	udfs, err := scalaExec.getUDFs(ctx, info.GetArgs().GetUdfs())
 	if err != nil {
 		return nil, err
@@ -56,13 +62,15 @@ func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.RunJob) (
 	if info.GetArgs().GetParallelism() > 0 {
 		jobProp["parallelism"] = strconv.FormatInt(int64(info.GetArgs().GetParallelism()), 10)
 	}
-
+	if err = scalaExec.PreHandle(ctx, info.SpaceId, info.InstanceId, result); err != nil {
+		return nil, err
+	}
 	if result, err = session.SubmitWithProperties("", jobProp, info.GetCode().Scala.Code); err != nil {
 		return nil, err
 	}
 
 	defer func() {
-		scalaExec.HandleResults(ctx, info.SpaceId, info.InstanceId, result, session)
+		scalaExec.PostHandle(ctx, info.SpaceId, info.InstanceId, result, session)
 	}()
 	for {
 		if result, err = session.QueryStatement(result.StatementId); err != nil {

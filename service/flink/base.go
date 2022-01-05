@@ -78,7 +78,45 @@ func TransResult(result *zeppelin.ExecuteResult) (string, model.StreamJobInst_St
 	return data, status
 }
 
-func (bm *BaseExecutor) HandleResults(ctx context.Context, spaceId string, instanceId string,
+func (bm *BaseExecutor) PreConn(ctx context.Context, instanceId string) (*zeppelin.ExecuteResult, error) {
+	if result, err := bm.GetResult(ctx, instanceId); err != nil && !errors.Is(err, qerror.ResourceNotExists) {
+		return nil, err
+	} else {
+		if result.State == model.StreamJobInst_Running {
+			return &zeppelin.ExecuteResult{
+				StatementId: result.StatementId,
+				Status:      zeppelin.RUNNING,
+				Results:     nil,
+				JobUrls:     nil,
+				JobId:       result.FlinkId,
+				Progress:    0,
+				FlinkUrl:    "",
+				SessionInfo: nil,
+			}, nil
+		} else if result.State == 0 && len(result.SessionId) > 0 && len(result.StatementId) > 0 {
+			session, err := zeppelin.CreateFromExistingSession(bm.zeppelinConfig, "flink", result.SessionId)
+			if err != nil {
+				return nil, err
+			}
+			return session.QueryStatement(result.StatementId)
+		}
+	}
+	return nil, nil
+}
+
+func (bm *BaseExecutor) PreHandle(ctx context.Context, spaceId string, instanceId string, result *zeppelin.ExecuteResult) error {
+	jobInfo := model.JobInfo{
+		SpaceId:     spaceId,
+		InstanceId:  instanceId,
+		NoteId:      result.SessionInfo.NoteId,
+		SessionId:   result.SessionInfo.SessionId,
+		StatementId: result.StatementId,
+		FlinkId:     "",
+	}
+	return bm.UpsertResult(ctx, &jobInfo)
+}
+
+func (bm *BaseExecutor) PostHandle(ctx context.Context, spaceId string, instanceId string,
 	result *zeppelin.ExecuteResult, session *zeppelin.ZSession) {
 	if result != nil && (len(result.Results) > 0 || len(result.JobId) == 32) {
 		if len(result.JobId) != 32 && (result.Status.IsRunning() || result.Status.IsPending()) {
@@ -197,7 +235,7 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.R
 		return nil, qerror.ParseEngineFlinkUrlFailed.Format(flinkUrl)
 	}
 
-	//properties["flink.execution.mode"] = "remote"
+	properties["flink.execution.mode"] = "remote"
 	//properties["flink.execution.remote.host"] = "127.0.0.1"
 	//properties["flink.execution.remote.port"] = "8081"
 	//flinkVersion := "flink-1.12.3-scala_2.11"
@@ -237,6 +275,9 @@ func (bm *BaseExecutor) CancelJob(ctx context.Context, instanceId string, spaceI
 	//flinkUrl := "127.0.0.1:8081"
 	flinkUrl, _, err := bm.engineClient.GetEngineInfo(ctx, spaceId, clusterId)
 	if err != nil {
+		if errors.Is(err, qerror.ResourceNotExists) {
+			return nil
+		}
 		return err
 	}
 

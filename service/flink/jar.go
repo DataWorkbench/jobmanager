@@ -24,6 +24,12 @@ func NewJarExecutor(bm *BaseExecutor, ctx context.Context) *JarExecutor {
 }
 
 func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ExecuteResult, error) {
+	//if result, err := jarExec.PreConn(ctx, info.InstanceId); err != nil {
+	//	return nil, err
+	//} else if result != nil {
+	//	return result, nil
+	//}
+
 	jar := info.GetCode().GetJar()
 	properties := map[string]string{}
 	properties["shell.command.timeout.millisecs"] = "30000"
@@ -72,13 +78,19 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 		return nil, err
 	}
 
-	result, err := session.Exec(code)
+	result, err := session.Sub(code)
 	if err != nil {
+		return nil, err
+	}
+	if err = jarExec.PreHandle(ctx, info.SpaceId, info.InstanceId, result); err != nil {
+		return nil, err
+	}
+	if result, err = session.WaitUntilFinished(result.StatementId); err != nil {
 		return nil, err
 	}
 
 	defer func() {
-		jarExec.HandleResults(ctx, info.SpaceId, info.InstanceId, result, session)
+		jarExec.PostHandle(ctx, info.SpaceId, info.InstanceId, result, session)
 	}()
 	if result.Results != nil && len(result.Results) > 0 {
 		for _, re := range result.Results {

@@ -25,6 +25,12 @@ func NewSqlExecutor(ctx context.Context, bm *BaseExecutor) *SqlExecutor {
 }
 
 func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ExecuteResult, error) {
+	//if result, err := sqlExec.PreConn(ctx, info.InstanceId); err != nil {
+	//	return nil, err
+	//} else if result != nil {
+	//	return result, nil
+	//}
+
 	udfs, err := sqlExec.getUDFs(ctx, info.GetArgs().GetUdfs())
 	if err != nil {
 		return nil, err
@@ -63,9 +69,12 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 		return result, err
 	}
 
+	if err = sqlExec.PreHandle(ctx, info.SpaceId, info.InstanceId, result); err != nil {
+		return nil, err
+	}
 	// TODO if execute with batch type ssql waitUntilFinished
 	defer func() {
-		sqlExec.HandleResults(ctx, info.SpaceId, info.InstanceId, result, session)
+		sqlExec.PostHandle(ctx, info.SpaceId, info.InstanceId, result, session)
 	}()
 	for {
 		if result, err = session.QueryStatement(result.StatementId); err != nil {
@@ -95,8 +104,8 @@ func (sqlExec *SqlExecutor) Cancel(ctx context.Context, instanceId string, space
 
 func (sqlExec *SqlExecutor) Validate(jobCode *model.StreamJobCode) (bool, string, error) {
 	builder := strings.Builder{}
-	//builder.WriteString("java -jar /zeppelin/flink/depends/sql-validator.jar ")
-	builder.WriteString("java -jar /Users/apple/develop/java/sql-vadilator/target/sql-validator.jar ")
+	builder.WriteString("java -jar /zeppelin/flink/depends/sql-validator.jar ")
+	//builder.WriteString("java -jar /Users/apple/develop/java/sql-vadilator/target/sql-validator.jar ")
 	builder.WriteString(base64.StdEncoding.EncodeToString([]byte(jobCode.Sql.Code)))
 	session := zeppelin.NewZSession(sqlExec.zeppelinConfig, "sh")
 	defer func() {

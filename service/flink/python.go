@@ -25,6 +25,12 @@ func NewPythonExecutor(bm *BaseExecutor, ctx context.Context) *PythonExecutor {
 }
 
 func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ExecuteResult, error) {
+	//if result, err := pyExec.PreConn(ctx, info.InstanceId); err != nil {
+	//	return nil, err
+	//} else if result != nil {
+	//	return result, nil
+	//}
+
 	udfs, err := pyExec.getUDFs(ctx, info.GetArgs().GetUdfs())
 	if err != nil {
 		return nil, err
@@ -60,9 +66,11 @@ func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.RunJob) (*z
 	if result, err = session.SubmitWithProperties("ipyflink", jobProp, info.GetCode().Scala.Code); err != nil {
 		return result, err
 	}
-
+	if err = pyExec.PreHandle(ctx, info.SpaceId, info.InstanceId, result); err != nil {
+		return nil, err
+	}
 	defer func() {
-		pyExec.HandleResults(ctx, info.SpaceId, info.InstanceId, result, session)
+		pyExec.PostHandle(ctx, info.SpaceId, info.InstanceId, result, session)
 	}()
 	for {
 		if result, err = session.QueryStatement(result.StatementId); err != nil {
