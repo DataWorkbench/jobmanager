@@ -90,5 +90,6 @@ func createFlinkExecutor(ctx context.Context, bm *flinkService.BaseExecutor) map
 	executors[model.StreamJob_SQL] = flinkService.NewExecutor(ctx, model.StreamJob_SQL, bm)
 	executors[model.StreamJob_Jar] = flinkService.NewExecutor(ctx, model.StreamJob_Jar, bm)
 	executors[model.StreamJob_Scala] = flinkService.NewExecutor(ctx, model.StreamJob_Scala, bm)
+	executors[model.StreamJob_Python] = flinkService.NewExecutor(ctx, model.StreamJob_Python, bm)
 	return executors
 }

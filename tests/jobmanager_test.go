@@ -76,7 +76,7 @@ func Test_Validate(t *testing.T) {
 
 	sql := flinkpb.FlinkSQL{Code: code}
 	jobCode := model.StreamJobCode{
-		Type:      model.StreamJob_SQL,
+		Type:      model.StreamJob_Python,
 		Operators: nil,
 		Sql:       &sql,
 		Jar:       nil,

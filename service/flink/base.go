@@ -2,6 +2,8 @@ package flink
 
 import (
 	"context"
+	"strings"
+
 	"github.com/DataWorkbench/common/constants"
 	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/qerror"
@@ -13,7 +15,6 @@ import (
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"strings"
 )
 
 var (
