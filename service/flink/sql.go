@@ -53,7 +53,6 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 		}
 	}
 	jobProp := map[string]string{}
-	jobProp["jobName"] = info.GetInstanceId()
 	if info.GetArgs().GetParallelism() > 0 {
 		jobProp["parallelism"] = strconv.FormatInt(int64(info.GetArgs().GetParallelism()), 10)
 	}

@@ -53,7 +53,6 @@ func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.RunJob) (
 		}
 	}
 	jobProp := map[string]string{}
-	jobProp["jobName"] = info.GetInstanceId()
 	if info.GetArgs().GetParallelism() > 0 {
 		jobProp["parallelism"] = strconv.FormatInt(int64(info.GetArgs().GetParallelism()), 10)
 	}
