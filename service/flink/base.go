@@ -159,7 +159,7 @@ func (bm *BaseExecutor) getResult(ctx context.Context, instanceId string) (*mode
 }
 
 func (bm *BaseExecutor) getConnectors(builtInConnectors []string, flinkVersion string) string {
-	var libDir string = "/zeppelin/flink/1.12_lib/"
+	var libDir = "/zeppelin/flink/1.12_lib/"
 	var executeJars string
 	connectorSet := map[string]string{}
 	connectorJarMap := constants.FlinkConnectorJarMap[flinkVersion]
@@ -172,10 +172,7 @@ func (bm *BaseExecutor) getConnectors(builtInConnectors []string, flinkVersion s
 	for jar := range connectorSet {
 		executeJars += jar
 	}
-	if executeJars != "" && len(executeJars) > 0 && strings.HasSuffix(executeJars, ",") {
-		executeJars = executeJars[:strings.LastIndex(executeJars, ",")-1]
-	}
-
+	executeJars = strings.TrimSuffix(executeJars, ",")
 	return executeJars
 }
 

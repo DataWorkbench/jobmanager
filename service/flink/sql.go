@@ -78,9 +78,22 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	if info.GetArgs().GetParallelism() > 0 {
 		jobProp["parallelism"] = strconv.FormatInt(int64(info.GetArgs().GetParallelism()), 10)
 	}
-	if strings.Contains(strings.ToLower(info.GetCode().Sql.Code), "insert") {
+	if strings.Contains(strings.ToLower(info.GetCode().GetSql().GetCode()), "insert") {
 		jobProp["runAsOne"] = "true"
+	} else if !strings.Contains(strings.ToLower(info.GetCode().GetSql().GetCode()), "select") {
+		//TODO 这种没有dml的sql 也会成功但是没有jobId，这里按照Finished 处理
+		result = &zeppelin.ParagraphResult{
+			NoteId:      noteId,
+			ParagraphId: "",
+			Status:      zeppelin.FINISHED,
+			Progress:    0,
+			Results:     nil,
+			JobUrls:     nil,
+			JobId:       "",
+		}
+		return result, nil
 	}
+
 	if result, err = sqlExec.zeppelinClient.Submit("flink", "ssql", noteId, info.GetCode().GetSql().GetCode()); err != nil {
 		return result, err
 	}

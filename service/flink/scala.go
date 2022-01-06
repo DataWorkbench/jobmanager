@@ -111,8 +111,8 @@ func (scalaExec *ScalaExecutor) Cancel(ctx context.Context, instanceId string, s
 	return scalaExec.cancelJob(ctx, instanceId, spaceId, clusterId)
 }
 
-func (scalaExec *ScalaExecutor) Release(ctx context.Context,instanceId string) error{
-	return scalaExec.release(ctx,instanceId)
+func (scalaExec *ScalaExecutor) Release(ctx context.Context, instanceId string) error {
+	return scalaExec.release(ctx, instanceId)
 }
 
 func (scalaExec *ScalaExecutor) Validate(jobCode *model.StreamJobCode) (bool, string, error) {
