@@ -23,12 +23,21 @@ func NewJarExecutor(bm *BaseExecutor, ctx context.Context) *JarExecutor {
 	}
 }
 
-func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ExecuteResult, error) {
-	//if result, err := jarExec.PreConn(ctx, info.InstanceId); err != nil {
-	//	return nil, err
-	//} else if result != nil {
-	//	return result, nil
-	//}
+func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ParagraphResult, error) {
+	var result *zeppelin.ParagraphResult
+	var noteId string
+	defer func() {
+		if result != nil && result.Status != zeppelin.RUNNING && len(noteId) > 0 {
+			_ = jarExec.zeppelinClient.DeleteNote(noteId)
+		}
+	}()
+
+	result, err := jarExec.preCheck(ctx, info.InstanceId)
+	if err != nil {
+		return nil, err
+	} else if result != nil {
+		return result, nil
+	}
 
 	jar := info.GetCode().GetJar()
 	properties := map[string]string{}
@@ -39,19 +48,16 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	if err != nil {
 		return nil, err
 	}
-
 	jarName, jarUrl, err := jarExec.resourceClient.GetFileById(ctx, jar.ResourceId)
 	if err != nil {
 		return nil, err
 	}
 	localJarPath := "/tmp/" + jarName
-
 	udfs, err := jarExec.getUDFs(ctx, info.GetArgs().GetUdfs())
 	if err != nil {
 		return nil, err
 	}
 	jars := jarExec.getUDFJars(udfs)
-
 	builder := strings.Builder{}
 	builder.WriteString(fmt.Sprintf("hdfs dfs -get %v %v\n", jarUrl, localJarPath))
 	var udfJars []string
@@ -72,48 +78,51 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	}
 	builder.WriteString(fmt.Sprintf(" %s %s", localJarPath, jar.GetJarArgs()))
 	code := builder.String()
-
-	session := zeppelin.NewZSessionWithProperties(jarExec.zeppelinConfig, SHELL, properties)
-	if err = session.Start(); err != nil {
-		return nil, err
-	}
-
-	result, err := session.Sub(code)
+	noteId, err = jarExec.initNote("sh", info.GetInstanceId(), properties)
 	if err != nil {
 		return nil, err
 	}
-	if err = jarExec.PreHandle(ctx, info.SpaceId, info.InstanceId, result); err != nil {
-		return nil, err
-	}
-	if result, err = session.WaitUntilFinished(result.StatementId); err != nil {
-		return nil, err
-	}
 
+	result, err = jarExec.zeppelinClient.Submit("sh", "", noteId, code)
+	if err != nil {
+		return nil, err
+	}
+	if err = jarExec.PreHandle(ctx, info.InstanceId, noteId, result.ParagraphId); err != nil {
+		return nil, err
+	}
 	defer func() {
-		jarExec.PostHandle(ctx, info.SpaceId, info.InstanceId, result, session)
+		jarExec.PostHandle(ctx, info.InstanceId, noteId, result)
 	}()
-	if result.Results != nil && len(result.Results) > 0 {
-		for _, re := range result.Results {
-			if strings.EqualFold(re.Type, "TEXT") {
-				jobInfo := strings.Split(re.Data, "JobID ")
-				if len(jobInfo) == 2 {
-					if jobId := strings.ReplaceAll(jobInfo[1], "\n", ""); len(jobId) == 32 {
-						result.JobId = jobId
-						return result, nil
-					}
-				}
+	for {
+		if result, err = jarExec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
+			return nil, err
+		}
+		if result.Status.IsFailed() {
+			return result, err
+		}
+		if result.Results != nil && len(result.Results) > 0 {
+			data := result.Results[0].Data
+			jobInfo := strings.Split(data, "JobID ")
+			if len(jobInfo) == 2 && len(strings.ReplaceAll(jobInfo[1], "\n", "")) == 32 {
+				result.JobId = strings.ReplaceAll(jobInfo[1], "\n", "")
+				return result, nil
 			}
+			result.Status = zeppelin.ABORT
+			return result, nil
 		}
 	}
-	return result, nil
 }
 
 func (jarExec *JarExecutor) GetInfo(ctx context.Context, instanceId string, spaceId string, clusterId string) (*flink.Job, error) {
-	return jarExec.GetJobInfo(ctx, instanceId, spaceId, clusterId)
+	return jarExec.getJobInfo(ctx, instanceId, spaceId, clusterId)
 }
 
 func (jarExec *JarExecutor) Cancel(ctx context.Context, instanceId string, spaceId string, clusterId string) error {
-	return jarExec.CancelJob(ctx, instanceId, spaceId, clusterId)
+	return jarExec.cancelJob(ctx, instanceId, spaceId, clusterId)
+}
+
+func (jarExec *JarExecutor) Release(ctx context.Context,instanceId string) error{
+	return jarExec.release(ctx,instanceId)
 }
 
 func (jarExec *JarExecutor) Validate(jobCode *model.StreamJobCode) (bool, string, error) {

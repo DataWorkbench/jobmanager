@@ -2,6 +2,7 @@ package flink
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/DataWorkbench/common/constants"
@@ -36,7 +37,7 @@ type BaseExecutor struct {
 	udfClient      utils.UdfClient
 	resourceClient utils.ResourceClient
 	flinkClient    *flink.Client
-	zeppelinConfig zeppelin.ClientConfig
+	zeppelinClient *zeppelin.Client
 	jobInfos       chan *model.JobInfo
 }
 
@@ -55,12 +56,12 @@ func NewBaseManager(ctx context.Context, db *gorm.DB, logger *glog.Logger, engin
 		udfClient:      udfClient,
 		resourceClient: resourceClient,
 		flinkClient:    flink.NewFlinkClient(flinkConfig),
-		zeppelinConfig: zeppelinConfig,
+		zeppelinClient: zeppelin.NewZeppelinClient(zeppelinConfig),
 		jobInfos:       make(chan *model.JobInfo, 100),
 	}
 }
 
-func TransResult(result *zeppelin.ExecuteResult) (string, model.StreamJobInst_State) {
+func TransResult(result *zeppelin.ParagraphResult) (string, model.StreamJobInst_State) {
 	var data string
 	var status model.StreamJobInst_State
 	for _, re := range result.Results {
@@ -79,84 +80,78 @@ func TransResult(result *zeppelin.ExecuteResult) (string, model.StreamJobInst_St
 	return data, status
 }
 
-func (bm *BaseExecutor) PreConn(ctx context.Context, instanceId string) (*zeppelin.ExecuteResult, error) {
-	if result, err := bm.GetResult(ctx, instanceId); err != nil && !errors.Is(err, qerror.ResourceNotExists) {
+func (bm *BaseExecutor) preCheck(ctx context.Context, instanceId string) (*zeppelin.ParagraphResult, error) {
+	if jobInfo, err := bm.getResult(ctx, instanceId); err != nil && !errors.Is(err, qerror.ResourceNotExists) {
 		return nil, err
-	} else {
-		if result.State == model.StreamJobInst_Running {
-			return &zeppelin.ExecuteResult{
-				StatementId: result.StatementId,
+	} else if jobInfo != nil {
+		if jobInfo.State == model.StreamJobInst_Running || jobInfo.State == model.StreamJobInst_Succeed {
+			result := zeppelin.ParagraphResult{
+				NoteId:      jobInfo.NoteId,
+				ParagraphId: jobInfo.ParagraphId,
 				Status:      zeppelin.RUNNING,
+				Progress:    0,
 				Results:     nil,
 				JobUrls:     nil,
-				JobId:       result.FlinkId,
-				Progress:    0,
-				FlinkUrl:    "",
-				SessionInfo: nil,
-			}, nil
-		} else if result.State == 0 && len(result.SessionId) > 0 && len(result.StatementId) > 0 {
-			session, err := zeppelin.CreateFromExistingSession(bm.zeppelinConfig, "flink", result.SessionId)
-			if err != nil {
-				return nil, err
+				JobId:       jobInfo.FlinkId,
 			}
-			return session.QueryStatement(result.StatementId)
+			return &result, err
+		} else if len(jobInfo.NoteId) > 0 {
+			_ = bm.zeppelinClient.DeleteNote(jobInfo.NoteId)
 		}
 	}
 	return nil, nil
 }
 
-func (bm *BaseExecutor) PreHandle(ctx context.Context, spaceId string, instanceId string, result *zeppelin.ExecuteResult) error {
+func (bm *BaseExecutor) PreHandle(ctx context.Context, instanceId string, noteId string, paragraphId string) error {
 	jobInfo := model.JobInfo{
-		SpaceId:     spaceId,
 		InstanceId:  instanceId,
-		NoteId:      result.SessionInfo.NoteId,
-		SessionId:   result.SessionInfo.SessionId,
-		StatementId: result.StatementId,
+		NoteId:      noteId,
+		ParagraphId: paragraphId,
 		FlinkId:     "",
 	}
-	return bm.UpsertResult(ctx, &jobInfo)
+	return bm.upsertResult(ctx, &jobInfo)
 }
 
-func (bm *BaseExecutor) PostHandle(ctx context.Context, spaceId string, instanceId string,
-	result *zeppelin.ExecuteResult, session *zeppelin.ZSession) {
+func (bm *BaseExecutor) PostHandle(ctx context.Context, instanceId string, noteId string,
+	result *zeppelin.ParagraphResult) {
 	if result != nil && (len(result.Results) > 0 || len(result.JobId) == 32) {
 		if len(result.JobId) != 32 && (result.Status.IsRunning() || result.Status.IsPending()) {
-			_ = session.Stop()
 			result.Status = zeppelin.ABORT
 		} else {
 			data, state := TransResult(result)
 			jobInfo := model.JobInfo{
-				SpaceId:     spaceId,
 				InstanceId:  instanceId,
-				NoteId:      result.SessionInfo.NoteId,
-				SessionId:   result.SessionInfo.SessionId,
-				StatementId: result.StatementId,
+				NoteId:      noteId,
+				ParagraphId: result.ParagraphId,
 				FlinkId:     result.JobId,
 				Message:     data,
 				State:       state,
 			}
-			if err := bm.UpsertResult(ctx, &jobInfo); err != nil {
-				_ = session.Stop()
+			if err := bm.upsertResult(ctx, &jobInfo); err != nil {
 				result.Status = zeppelin.ABORT
 			}
 		}
 	}
 }
 
-func (bm *BaseExecutor) UpsertResult(ctx context.Context, jobInfo *model.JobInfo) error {
+func (bm *BaseExecutor) upsertResult(ctx context.Context, jobInfo *model.JobInfo) error {
 	db := bm.db.WithContext(ctx)
 	return db.Table(JobManager).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "instance_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"session_id", "statement_id", "flink_id", "state", "message"}),
+		DoUpdates: clause.AssignmentColumns([]string{"note_id", "paragraph_id", "flink_id", "state", "message"}),
 	}).Create(jobInfo).Error
 }
 
-func (bm *BaseExecutor) GetResult(ctx context.Context, instanceId string) (*model.JobInfo, error) {
+func (bm *BaseExecutor) deleteResult(ctx context.Context, instanceId string) error {
+	return bm.db.WithContext(ctx).Table(JobManager).Where("instance_id = ?", instanceId).Delete(&model.JobInfo{}).Error
+}
+
+func (bm *BaseExecutor) getResult(ctx context.Context, instanceId string) (*model.JobInfo, error) {
 	var jobInfo model.JobInfo
 	db := bm.db.WithContext(ctx)
 	if err := db.Table(JobManager).Clauses(clause.Locking{Strength: "UPDATE"}).Where("instance_id", instanceId).First(&jobInfo).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			err = qerror.ResourceNotExists.Format(instanceId)
+			err = qerror.ResourceNotExists
 		}
 		return nil, err
 	}
@@ -164,13 +159,14 @@ func (bm *BaseExecutor) GetResult(ctx context.Context, instanceId string) (*mode
 }
 
 func (bm *BaseExecutor) getConnectors(builtInConnectors []string, flinkVersion string) string {
+	var libDir string = "/zeppelin/flink/1.12_lib/"
 	var executeJars string
 	connectorSet := map[string]string{}
 	connectorJarMap := constants.FlinkConnectorJarMap[flinkVersion]
 	for _, connector := range builtInConnectors {
 		jars := connectorJarMap[connector]
 		for _, jar := range jars {
-			connectorSet[jar+","] = ""
+			connectorSet[libDir+jar+","] = ""
 		}
 	}
 	for jar := range connectorSet {
@@ -219,6 +215,29 @@ func (bm *BaseExecutor) getUDFJars(udfs []*Udf) string {
 	return executionUdfJars
 }
 
+func (bm *BaseExecutor) registerUDF(noteId string, udfs []*Udf) (*zeppelin.ParagraphResult, error) {
+	var result *zeppelin.ParagraphResult
+	var err error
+	for _, udf := range udfs {
+		switch udf.udfType {
+		case model.UDFInfo_Scala:
+			result, err = bm.zeppelinClient.Execute("flink", "", noteId, udf.code)
+			if err != nil {
+				return nil, err
+			}
+		case model.UDFInfo_Python:
+			result, err = bm.zeppelinClient.Execute("flink", "ipyflink", noteId, udf.code)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	if result != nil && !result.Status.IsFinished() {
+		bm.logger.Warn().Msg("register udf function failed.")
+	}
+	return result, nil
+}
+
 func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.RunJob, udfs []*Udf) (map[string]string, error) {
 	properties := map[string]string{}
 	properties["FLINK_HOME"] = "/zeppelin/flink/flink-1.12.3"
@@ -229,13 +248,15 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.R
 	}
 	host := flinkUrl[:strings.Index(flinkUrl, ":")]
 	port := flinkUrl[strings.Index(flinkUrl, ":")+1:]
-	properties["flink.execution.mode"] = "remote"
 	if host != "" && len(host) > 0 && port != "" && len(port) > 0 {
 		properties["flink.execution.remote.host"] = host
 		properties["flink.execution.remote.port"] = port
 	} else {
 		return nil, qerror.ParseEngineFlinkUrlFailed.Format(flinkUrl)
 	}
+	properties["flink.execution.mode"] = "remote"
+	properties["zeppelin.flink.concurrentBatchSql.max"] = "100000"
+	properties["zeppelin.flink.concurrentStreamSql.max"] = "100000"
 
 	//properties["FLINK_HOME"] = "/Users/apple/develop/bigdata/flink-1.12.5"
 	//properties["flink.execution.remote.host"] = "127.0.0.1"
@@ -253,14 +274,55 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.R
 	return properties, nil
 }
 
-func (bm *BaseExecutor) GetJobInfo(ctx context.Context, instanceId string, spaceId string, clusterId string) (*flink.Job, error) {
+func (bm *BaseExecutor) initNote(interceptor string, instanceId string, properties map[string]string) (string, error) {
+	noteId, err := bm.zeppelinClient.CreateNote(instanceId)
+	if err != nil {
+		if err == qerror.ZeppelinNoteAlreadyExists {
+			_ = bm.zeppelinClient.DeleteNote(instanceId)
+			noteId, err = bm.zeppelinClient.CreateNote(instanceId)
+			if err != nil {
+				return "", err
+			}
+		} else {
+			return "", err
+		}
+	}
+	builder := strings.Builder{}
+	builder.WriteString("%" + interceptor + ".conf\n")
+	for k, v := range properties {
+		builder.WriteString(fmt.Sprintf("%v %v\n", k, v))
+	}
+	confParagraphId, err := bm.zeppelinClient.AddParagraph(noteId, "conf", builder.String())
+	if err != nil {
+		return "", err
+	}
+	if _, err = bm.zeppelinClient.ExecuteParagraph(noteId, confParagraphId); err != nil {
+		return "", err
+	}
+	builder.Reset()
+	builder.WriteString("%" + interceptor + "(init=true)")
+	initParagraphId, err := bm.zeppelinClient.AddParagraph(noteId, "init", builder.String())
+	if err != nil {
+		return "", err
+	}
+	var result *zeppelin.ParagraphResult
+	if result, err = bm.zeppelinClient.ExecuteParagraph(noteId, initParagraphId); err != nil {
+		return "", err
+	}
+	if !result.Status.IsFinished() {
+		return "", qerror.ZeppelinInitFailed
+	}
+	return noteId, nil
+}
+
+func (bm *BaseExecutor) getJobInfo(ctx context.Context, instanceId string, spaceId string, clusterId string) (*flink.Job, error) {
 	//flinkUrl := "127.0.0.1:8081"
 	flinkUrl, _, err := bm.engineClient.GetEngineInfo(ctx, spaceId, clusterId)
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := bm.GetResult(ctx, instanceId)
+	result, err := bm.getResult(ctx, instanceId)
 	if err != nil {
 		//if errors.Is(err, gorm.ErrRecordNotFound) {
 		//	// TODO 没有这条记录
@@ -273,16 +335,28 @@ func (bm *BaseExecutor) GetJobInfo(ctx context.Context, instanceId string, space
 	return bm.flinkClient.GetJobInfoByJobId(flinkUrl, result.FlinkId)
 }
 
-func (bm *BaseExecutor) CancelJob(ctx context.Context, instanceId string, spaceId string, clusterId string) error {
+func (bm *BaseExecutor) release(ctx context.Context, instanceId string) error {
+	result, err := bm.getResult(ctx, instanceId)
+	if err != nil {
+		return err
+	}
+	if len(result.NoteId) > 0 {
+		_ = bm.zeppelinClient.DeleteNote(result.NoteId)
+	}
+	return bm.deleteResult(ctx, instanceId)
+}
+
+func (bm *BaseExecutor) cancelJob(ctx context.Context, instanceId string, spaceId string, clusterId string) (err error) {
+	var result *model.JobInfo
 	//flinkUrl := "127.0.0.1:8081"
 	flinkUrl, _, err := bm.engineClient.GetEngineInfo(ctx, spaceId, clusterId)
 	if err != nil {
 		return err
 	}
 
-	result, err := bm.GetResult(ctx, instanceId)
+	result, err = bm.getResult(ctx, instanceId)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, qerror.ResourceNotExists) {
 			//TODO 没有这条记录
 			return nil
 		}
@@ -291,5 +365,6 @@ func (bm *BaseExecutor) CancelJob(ctx context.Context, instanceId string, spaceI
 	//if len(result.FlinkId) != 32 {
 	//	// TODO 记录下来,返回失败
 	//}
-	return bm.flinkClient.CancelJob(flinkUrl, result.FlinkId)
+	err = bm.flinkClient.CancelJob(flinkUrl, result.FlinkId)
+	return err
 }

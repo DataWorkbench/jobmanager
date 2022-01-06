@@ -14,11 +14,12 @@ import (
 )
 
 var (
-	client     jobpb.JobmanagerClient
-	ctx        context.Context
-	spaceId    = "wks-0123456789012345"
-	instanceId = "syx-JHGYFjhKwUfaQDHZ"
-	clusterId  = "cfi-05636e792cfe5000"
+	client      jobpb.JobmanagerClient
+	ctx         context.Context
+	spaceId     = "wks-0123456789012345"
+	instanceId  = "syx-JHGYFjhKwUfaQDHZ"
+	instanceId2 = "syx-JHGYFjhKwUfaQDHQ"
+	clusterId   = "cfi-05636e792cfe5000"
 )
 
 func init() {
@@ -88,7 +89,37 @@ func Test_RunScala(t *testing.T) {
 		Python:    nil,
 	}
 	req := request.RunJob{
-		InstanceId:    instanceId,
+		InstanceId:    instanceId2,
+		SpaceId:       spaceId,
+		Args:          &args,
+		Code:          &code,
+		SavepointPath: "",
+	}
+	job, err := client.RunJob(ctx, &req)
+	require.Nil(t, err)
+	fmt.Println(job)
+}
+
+func Test_RunPython(t *testing.T) {
+	args := model.StreamJobArgs{
+		ClusterId:         clusterId,
+		Parallelism:       1,
+		Udfs:              nil,
+		Connectors:        nil,
+		BuiltInConnectors: nil,
+	}
+	jobType := model.StreamJob_Python
+	python := flinkpb.FlinkPython{Code: "val data = benv.fromElements(\"hello world\", \"hello flink\", \"hello hadoop\")\ndata.flatMap(line => line.split(\"\\\\s\"))\n             .map(w => (w, 1))\n             .groupBy(0)\n             .sum(1)\n             .print()"}
+	code := model.StreamJobCode{
+		Type:      jobType,
+		Operators: nil,
+		Sql:       nil,
+		Jar:       nil,
+		Scala:     nil,
+		Python:    &python,
+	}
+	req := request.RunJob{
+		InstanceId:    instanceId2,
 		SpaceId:       spaceId,
 		Args:          &args,
 		Code:          &code,

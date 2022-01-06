@@ -24,12 +24,20 @@ func NewScalaExecutor(bm *BaseExecutor, ctx context.Context) *ScalaExecutor {
 	}
 }
 
-func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ExecuteResult, error) {
-	//if result, err := scalaExec.PreConn(ctx, info.InstanceId); err != nil {
-	//	return nil, err
-	//} else if result != nil {
-	//	return result, nil
-	//}
+func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ParagraphResult, error) {
+	var result *zeppelin.ParagraphResult
+	var noteId string
+	defer func() {
+		if result != nil && result.Status != zeppelin.RUNNING && len(noteId) > 0 {
+			_ = scalaExec.zeppelinClient.DeleteNote(noteId)
+		}
+	}()
+	result, err := scalaExec.preCheck(ctx, info.InstanceId)
+	if err != nil {
+		return nil, err
+	} else if result != nil {
+		return result, nil
+	}
 
 	udfs, err := scalaExec.getUDFs(ctx, info.GetArgs().GetUdfs())
 	if err != nil {
@@ -39,42 +47,30 @@ func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.RunJob) (
 	if err != nil {
 		return nil, err
 	}
-	session := zeppelin.NewZSessionWithProperties(scalaExec.zeppelinConfig, FLINK, properties)
-	if err = session.Start(); err != nil {
+	noteId, err = scalaExec.initNote("flink", info.GetInstanceId(), properties)
+	if err != nil {
 		return nil, err
 	}
-	var result *zeppelin.ExecuteResult
-	for _, udf := range udfs {
-		switch udf.udfType {
-		case model.UDFInfo_Scala:
-			result, err = session.Exec(udf.code)
-			if err != nil {
-				return nil, err
-			}
-		case model.UDFInfo_Python:
-			result, err = session.Execute("ipyflink", udf.code)
-			if err != nil {
-				return nil, err
-			}
-		}
+	result, err = scalaExec.registerUDF(noteId, udfs)
+	if err != nil {
+		return nil, err
 	}
+
 	jobProp := map[string]string{}
 	if info.GetArgs().GetParallelism() > 0 {
 		jobProp["parallelism"] = strconv.FormatInt(int64(info.GetArgs().GetParallelism()), 10)
 	}
-
-	if result, err = session.SubmitWithProperties("", jobProp, info.GetCode().Scala.Code); err != nil {
-		return nil, err
+	if result, err = scalaExec.zeppelinClient.Submit("flink", "", noteId, info.GetCode().GetScala().GetCode()); err != nil {
+		return result, err
 	}
-
-	if err = scalaExec.PreHandle(ctx, info.SpaceId, info.InstanceId, result); err != nil {
+	if err = scalaExec.PreHandle(ctx, info.InstanceId, noteId, result.ParagraphId); err != nil {
 		return nil, err
 	}
 	defer func() {
-		scalaExec.PostHandle(ctx, info.SpaceId, info.InstanceId, result, session)
+		scalaExec.PostHandle(ctx, info.InstanceId, noteId, result)
 	}()
 	for {
-		if result, err = session.QueryStatement(result.StatementId); err != nil {
+		if result, err = scalaExec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
 			return result, err
 		}
 		if result.Status.IsFailed() {
@@ -87,16 +83,20 @@ func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.RunJob) (
 			}
 			return result, nil
 		}
-		time.Sleep(time.Second * 1)
+		time.Sleep(time.Second * 5)
 	}
 }
 
 func (scalaExec *ScalaExecutor) GetInfo(ctx context.Context, instanceId string, spaceId string, clusterId string) (*flink.Job, error) {
-	return scalaExec.GetJobInfo(ctx, instanceId, spaceId, clusterId)
+	return scalaExec.getJobInfo(ctx, instanceId, spaceId, clusterId)
 }
 
 func (scalaExec *ScalaExecutor) Cancel(ctx context.Context, instanceId string, spaceId string, clusterId string) error {
-	return scalaExec.CancelJob(ctx, instanceId, spaceId, clusterId)
+	return scalaExec.cancelJob(ctx, instanceId, spaceId, clusterId)
+}
+
+func (scalaExec *ScalaExecutor) Release(ctx context.Context,instanceId string) error{
+	return scalaExec.release(ctx,instanceId)
 }
 
 func (scalaExec *ScalaExecutor) Validate(jobCode *model.StreamJobCode) (bool, string, error) {

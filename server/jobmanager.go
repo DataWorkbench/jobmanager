@@ -18,6 +18,10 @@ func NewJobManagerServer(service *service.JobManagerService) *JobManagerServer {
 	return &JobManagerServer{service: service}
 }
 
+func (s *JobManagerServer) PreRunJob(ctx context.Context, req *request.RunJob) (*model.EmptyStruct, error) {
+	return &model.EmptyStruct{}, s.service.PreRunFlinkJob(ctx, req)
+}
+
 func (s *JobManagerServer) RunJob(ctx context.Context, req *request.RunJob) (*response.RunJob, error) {
 	return s.service.RunFlinkJob(ctx, req)
 }
@@ -28,6 +32,10 @@ func (s *JobManagerServer) GetJobInfo(ctx context.Context, req *request.GetJobIn
 
 func (s *JobManagerServer) CancelJob(ctx context.Context, req *request.CancelJob) (*model.EmptyStruct, error) {
 	return &model.EmptyStruct{}, s.service.CancelFlinkJob(ctx, req.GetType(), req.GetInstanceId(), req.GetSpaceId(), req.GetClusterId())
+}
+
+func (s *JobManagerServer) ReleaseNote(ctx context.Context, req *request.ReleaseNote) (*model.EmptyStruct, error) {
+	return &model.EmptyStruct{}, s.service.ReleaseNote(ctx, req.GetType(), req.GetInstanceId())
 }
 
 func (s *JobManagerServer) ValidateJob(ctx context.Context, req *request.ValidateJob) (*response.StreamJobCodeSyntax, error) {

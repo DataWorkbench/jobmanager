@@ -44,9 +44,18 @@ func (jm *JobManagerService) RunFlinkJob(ctx context.Context, jobInfo *request.R
 	return &res, nil
 }
 
-func (jm *JobManagerService) CancelFlinkJob(ctx context.Context, jobType model.StreamJob_Type, jobId string, spaceId string, clusterId string) error {
+func (jm *JobManagerService) PreRunFlinkJob(ctx context.Context, jobInfo *request.RunJob) error {
+	return nil
+}
+
+func (jm *JobManagerService) ReleaseNote(ctx context.Context,jobType model.StreamJob_Type,instanceId string) error{
 	executor := jm.flinkExecutors[jobType]
-	return executor.Cancel(ctx, jobId, spaceId, clusterId)
+	return executor.Release(ctx,instanceId)
+}
+
+func (jm *JobManagerService) CancelFlinkJob(ctx context.Context, jobType model.StreamJob_Type, instanceId string, spaceId string, clusterId string) error {
+	executor := jm.flinkExecutors[jobType]
+	return executor.Cancel(ctx, instanceId, spaceId, clusterId)
 }
 
 func (jm *JobManagerService) GetFlinkJob(ctx context.Context, jobType model.StreamJob_Type, instanceId string, spaceId string, clusterId string) (*response.GetJobInfo, error) {

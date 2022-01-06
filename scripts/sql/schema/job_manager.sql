@@ -1,10 +1,8 @@
 create table job_manager
 (
     instance_id  varchar(24),
-    space_id     varchar(24),
     note_id      varchar(50),
-    session_id   varchar(50),
-    statement_id varchar(50),
+    paragraph_id varchar(50),
     flink_id     varchar(32),
     state        int,
     message      text,

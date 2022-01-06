@@ -7,6 +7,7 @@ import (
 	"github.com/DataWorkbench/common/zeppelin"
 	"github.com/DataWorkbench/gproto/pkg/model"
 	"github.com/DataWorkbench/gproto/pkg/request"
+	"github.com/google/uuid"
 	"strconv"
 	"strings"
 	"time"
@@ -24,12 +25,24 @@ func NewSqlExecutor(ctx context.Context, bm *BaseExecutor) *SqlExecutor {
 	}
 }
 
-func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ExecuteResult, error) {
-	//if result, err := sqlExec.PreConn(ctx, info.InstanceId); err != nil {
-	//	return nil, err
-	//} else if result != nil {
-	//	return result, nil
-	//}
+func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ParagraphResult, error) {
+	var result *zeppelin.ParagraphResult
+	var noteId string
+	var err error
+	defer func() {
+		if err == nil {
+			if result != nil && result.Status != zeppelin.RUNNING && len(noteId) > 0 {
+				_ = sqlExec.zeppelinClient.DeleteNote(noteId)
+			}
+		}
+	}()
+	// TODO 无论怎样都要加锁，能保证这个数据库查到的状态是上次调用结束后的状态
+	result, err = sqlExec.preCheck(ctx, info.InstanceId)
+	if err != nil {
+		return nil, err
+	} else if result != nil {
+		return result, nil
+	}
 
 	udfs, err := sqlExec.getUDFs(ctx, info.GetArgs().GetUdfs())
 	if err != nil {
@@ -39,25 +52,15 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	if err != nil {
 		return nil, err
 	}
-	session := zeppelin.NewZSessionWithProperties(sqlExec.zeppelinConfig, FLINK, properties)
-	if err = session.Start(); err != nil {
+	noteId, err = sqlExec.initNote("flink", info.GetInstanceId(), properties)
+	if err != nil {
 		return nil, err
 	}
-	var result *zeppelin.ExecuteResult
-	for _, udf := range udfs {
-		switch udf.udfType {
-		case model.UDFInfo_Scala:
-			result, err = session.Exec(udf.code)
-			if err != nil {
-				return nil, err
-			}
-		case model.UDFInfo_Python:
-			result, err = session.Execute("ipyflink", udf.code)
-			if err != nil {
-				return nil, err
-			}
-		}
+	result, err = sqlExec.registerUDF(noteId, udfs)
+	if err != nil {
+		return nil, err
 	}
+
 	jobProp := map[string]string{}
 	if info.GetArgs().GetParallelism() > 0 {
 		jobProp["parallelism"] = strconv.FormatInt(int64(info.GetArgs().GetParallelism()), 10)
@@ -65,19 +68,17 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	if strings.Contains(strings.ToLower(info.GetCode().Sql.Code), "insert") {
 		jobProp["runAsOne"] = "true"
 	}
-	if result, err = session.SubmitWithProperties("ssql", jobProp, info.GetCode().Sql.Code); err != nil {
+	if result, err = sqlExec.zeppelinClient.Submit("flink", "ssql", noteId, info.GetCode().GetSql().GetCode()); err != nil {
 		return result, err
 	}
-
-	if err = sqlExec.PreHandle(ctx, info.SpaceId, info.InstanceId, result); err != nil {
+	if err = sqlExec.PreHandle(ctx, info.InstanceId, noteId, result.ParagraphId); err != nil {
 		return nil, err
 	}
-	// TODO if execute with batch type ssql waitUntilFinished
 	defer func() {
-		sqlExec.PostHandle(ctx, info.SpaceId, info.InstanceId, result, session)
+		sqlExec.PostHandle(ctx, info.InstanceId, noteId, result)
 	}()
 	for {
-		if result, err = session.QueryStatement(result.StatementId); err != nil {
+		if result, err = sqlExec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
 			return result, err
 		}
 		if result.Status.IsFailed() {
@@ -90,16 +91,20 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 			}
 			return result, nil
 		}
-		time.Sleep(time.Second * 1)
+		time.Sleep(time.Second * 5)
 	}
 }
 
 func (sqlExec *SqlExecutor) GetInfo(ctx context.Context, instanceId string, spaceId string, clusterId string) (*flink.Job, error) {
-	return sqlExec.GetJobInfo(ctx, instanceId, spaceId, clusterId)
+	return sqlExec.getJobInfo(ctx, instanceId, spaceId, clusterId)
 }
 
 func (sqlExec *SqlExecutor) Cancel(ctx context.Context, instanceId string, spaceId string, clusterId string) error {
-	return sqlExec.CancelJob(ctx, instanceId, spaceId, clusterId)
+	return sqlExec.cancelJob(ctx, instanceId, spaceId, clusterId)
+}
+
+func (sqlExec *SqlExecutor) Release(ctx context.Context, instanceId string) error {
+	return sqlExec.release(ctx, instanceId)
 }
 
 func (sqlExec *SqlExecutor) Validate(jobCode *model.StreamJobCode) (bool, string, error) {
@@ -107,14 +112,16 @@ func (sqlExec *SqlExecutor) Validate(jobCode *model.StreamJobCode) (bool, string
 	builder.WriteString("java -jar /zeppelin/flink/depends/sql-validator.jar ")
 	//builder.WriteString("java -jar /Users/apple/develop/java/sql-vadilator/target/sql-validator.jar ")
 	builder.WriteString(base64.StdEncoding.EncodeToString([]byte(jobCode.Sql.Code)))
-	session := zeppelin.NewZSession(sqlExec.zeppelinConfig, "sh")
-	defer func() {
-		_ = session.Stop()
-	}()
-	if err := session.Start(); err != nil {
+	random, err := uuid.NewRandom()
+	if err != nil {
 		return false, "", err
 	}
-	if result, err := session.Exec(builder.String()); err != nil {
+	noteName := random.String()
+	noteId, err := sqlExec.zeppelinClient.CreateNote(noteName)
+	if err != nil {
+		return false, "", err
+	}
+	if result, err := sqlExec.zeppelinClient.Submit("sh", "", noteId, builder.String()); err != nil {
 		return false, "", err
 	} else if result.Results != nil && len(result.Results) > 0 {
 		return false, result.Results[0].Data, nil
