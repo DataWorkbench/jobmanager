@@ -118,6 +118,11 @@ func (sqlExec *SqlExecutor) Validate(jobCode *model.StreamJobCode) (bool, string
 	}
 	noteName := random.String()
 	noteId, err := sqlExec.zeppelinClient.CreateNote(noteName)
+	defer func() {
+		if len(noteId) > 0 {
+			_ = sqlExec.release(sqlExec.ctx, noteId)
+		}
+	}()
 	if err != nil {
 		return false, "", err
 	}
