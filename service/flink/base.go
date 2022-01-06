@@ -69,6 +69,9 @@ func TransResult(result *zeppelin.ParagraphResult) (string, model.StreamJobInst_
 			data = re.Data
 		}
 	}
+	fmt.Println("===========================================================")
+	fmt.Println(result.Status)
+	fmt.Println("===========================================================")
 	switch result.Status {
 	case zeppelin.RUNNING:
 		status = model.StreamJobInst_Running
@@ -76,6 +79,8 @@ func TransResult(result *zeppelin.ParagraphResult) (string, model.StreamJobInst_
 		status = model.StreamJobInst_Succeed
 	case zeppelin.ERROR:
 		status = model.StreamJobInst_Failed
+	default:
+		status = model.StreamJobInst_Running
 	}
 	return data, status
 }
