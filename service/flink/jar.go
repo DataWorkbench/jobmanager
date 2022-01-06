@@ -57,8 +57,8 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	jar := info.GetCode().GetJar()
 	properties := map[string]string{}
 	properties["shell.command.timeout.millisecs"] = "30000"
-	//flinkHome := "/zeppelin/flink/flink-1.12.3/"
-	flinkHome := "/Users/apple/develop/bigdata/flink-1.12.5"
+	flinkHome := "/zeppelin/flink/flink-1.12.3/"
+	//flinkHome := "/Users/apple/develop/bigdata/flink-1.12.5"
 	flinkUrl, _, err := jarExec.engineClient.GetEngineInfo(ctx, info.GetSpaceId(), info.GetArgs().GetClusterId())
 	if err != nil {
 		return nil, err
