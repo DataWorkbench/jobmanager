@@ -120,6 +120,7 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 			jobInfo := strings.Split(data, "JobID ")
 			if len(jobInfo) == 2 && len(strings.ReplaceAll(jobInfo[1], "\n", "")) == 32 {
 				result.JobId = strings.ReplaceAll(jobInfo[1], "\n", "")
+				result.Status = zeppelin.RUNNING
 				return result, nil
 			}
 			result.Status = zeppelin.ABORT
