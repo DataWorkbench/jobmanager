@@ -120,7 +120,7 @@ func (sqlExec *SqlExecutor) Validate(jobCode *model.StreamJobCode) (bool, string
 	noteId, err := sqlExec.zeppelinClient.CreateNote(noteName)
 	defer func() {
 		if len(noteId) > 0 {
-			_ = sqlExec.release(sqlExec.ctx, noteId)
+			_ = sqlExec.zeppelinClient.DeleteNote(noteId)
 		}
 	}()
 	if err != nil {

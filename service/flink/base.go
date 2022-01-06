@@ -365,6 +365,11 @@ func (bm *BaseExecutor) cancelJob(ctx context.Context, instanceId string, spaceI
 	//if len(result.FlinkId) != 32 {
 	//	// TODO 记录下来,返回失败
 	//}
+	defer func() {
+		if result != nil && len(result.NoteId) > 0 {
+			_ = bm.zeppelinClient.DeleteNote(result.NoteId)
+		}
+	}()
 	err = bm.flinkClient.CancelJob(flinkUrl, result.FlinkId)
 	return err
 }
