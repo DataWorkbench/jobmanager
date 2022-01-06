@@ -79,7 +79,7 @@ func Test_RunScala(t *testing.T) {
 		BuiltInConnectors: nil,
 	}
 	jobType := model.StreamJob_Scala
-	scala := flinkpb.FlinkScala{Code: "val data = benv.fromElements(\"hello world\", \"hello flink\", \"hello hadoop\")\ndata.flatMap(line => line.split(\"\\\\s\"))\n             .map(w => (w, 1))\n             .groupBy(0)\n             .sum(1)\n             .print()"}
+	scala := flinkpb.FlinkScala{Code: "object HelloWorld {\ndef main(args: Array[String]): Unit = {\n    println(\"Hello, world!\")\n  }\n}"}
 	code := model.StreamJobCode{
 		Type:      jobType,
 		Operators: nil,
@@ -109,7 +109,7 @@ func Test_RunPython(t *testing.T) {
 		BuiltInConnectors: nil,
 	}
 	jobType := model.StreamJob_Python
-	python := flinkpb.FlinkPython{Code: "val data = benv.fromElements(\"hello world\", \"hello flink\", \"hello hadoop\")\ndata.flatMap(line => line.split(\"\\\\s\"))\n             .map(w => (w, 1))\n             .groupBy(0)\n             .sum(1)\n             .print()"}
+	python := flinkpb.FlinkPython{Code: "object HelloWorld {\ndef main(args: Array[String]): Unit = {\n    println(\"Hello, world!\")\n  }\n}"}
 	code := model.StreamJobCode{
 		Type:      jobType,
 		Operators: nil,

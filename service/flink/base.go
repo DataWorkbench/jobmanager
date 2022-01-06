@@ -272,7 +272,13 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.R
 }
 
 func (bm *BaseExecutor) initNote(interceptor string, instanceId string, properties map[string]string) (string, error) {
+	var result *zeppelin.ParagraphResult
 	noteId, err := bm.zeppelinClient.CreateNote(instanceId)
+	defer func() {
+		if len(noteId) > 0 && (err != nil || (result != nil && result.Status != zeppelin.FINISHED)) {
+			_ = bm.zeppelinClient.DeleteNote(noteId)
+		}
+	}()
 	var notesMap map[string]string
 	if err != nil {
 		if err == qerror.ZeppelinNoteAlreadyExists {
@@ -309,7 +315,7 @@ func (bm *BaseExecutor) initNote(interceptor string, instanceId string, properti
 	if err != nil {
 		return "", err
 	}
-	var result *zeppelin.ParagraphResult
+
 	if result, err = bm.zeppelinClient.ExecuteParagraph(noteId, initParagraphId); err != nil {
 		return "", err
 	}
