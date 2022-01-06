@@ -112,7 +112,7 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 		if result, err = jarExec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
 			return nil, err
 		}
-		if !result.Status.IsRunning() {
+		if !result.Status.IsRunning() && !result.Status.IsPending() {
 			if result.Results != nil && len(result.Results) > 0 {
 				data := result.Results[0].Data
 				jobInfo := strings.Split(data, "JobID ")
