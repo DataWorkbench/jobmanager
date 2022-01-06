@@ -112,19 +112,22 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 		if result, err = jarExec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
 			return nil, err
 		}
-		if result.Status.IsFailed() {
-			return result, err
-		}
-		if result.Results != nil && len(result.Results) > 0 {
-			data := result.Results[0].Data
-			jobInfo := strings.Split(data, "JobID ")
-			if len(jobInfo) == 2 && len(strings.ReplaceAll(jobInfo[1], "\n", "")) == 32 {
-				result.JobId = strings.ReplaceAll(jobInfo[1], "\n", "")
-				result.Status = zeppelin.RUNNING
+		if !result.Status.IsRunning() {
+			if result.Results != nil && len(result.Results) > 0 {
+				data := result.Results[0].Data
+				jobInfo := strings.Split(data, "JobID ")
+				if len(jobInfo) == 2 {
+					res := strings.Split(jobInfo[1], "\n")
+					if len(res) > 0 && len(res[0]) == 32 {
+						result.JobId = res[0]
+						result.Status = zeppelin.RUNNING
+						return result, nil
+					}
+				}
+				result.Status = zeppelin.ABORT
 				return result, nil
 			}
-			result.Status = zeppelin.ABORT
-			return result, nil
+			return result, err
 		}
 	}
 }
