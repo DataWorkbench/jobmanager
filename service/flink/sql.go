@@ -152,7 +152,7 @@ func (sqlExec *SqlExecutor) Validate(jobCode *model.StreamJobCode) (bool, string
 	if err != nil {
 		return false, "", err
 	}
-	if result, err := sqlExec.zeppelinClient.Submit("sh", "", noteId, builder.String()); err != nil {
+	if result, err := sqlExec.zeppelinClient.Execute("sh", "", noteId, builder.String()); err != nil {
 		return false, "", err
 	} else if result.Results != nil && len(result.Results) > 0 {
 		return false, result.Results[0].Data, nil

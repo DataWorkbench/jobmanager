@@ -134,10 +134,11 @@ func Test_Validate(t *testing.T) {
 	var code = "create table if not exists datagen(id int,name string);" +
 		"create table if not exists print(id int,name string);" +
 		"insert into print select * from datagen;"
+	code = "drop table if exists scores;\ncreate table scores(\n    id int,\n    name varchar(10),\n    scores varchar(10),\n    grow_up varchar(10)) WITH (\n'connector' = 'jdbc',\n'url' = 'jdbc:mysql:gpleqcxjmkwrf8osvzh432b7g56tad9u.mysql.qingcloud.link:3306/cltest',\n'table-name' = 'scores',\n'username' = 'chenliang',\n'password' = 'Cl123456#'\n);\nINSERT INTO scores VALUES (2,'chengxin','98','yes');\n\n\nxxdafdafdas"
 
 	sql := flinkpb.FlinkSQL{Code: code}
 	jobCode := model.StreamJobCode{
-		Type:      model.StreamJob_Python,
+		Type:      model.StreamJob_SQL,
 		Operators: nil,
 		Sql:       &sql,
 		Jar:       nil,
