@@ -38,11 +38,11 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 						}
 					}
 				}
-				_ = jarExec.zeppelinClient.DeleteNote(noteId)
+				//_ = jarExec.zeppelinClient.DeleteNote(noteId)
 			} else if (result.Status == zeppelin.RUNNING || result.Status == zeppelin.FINISHED) &&
 				len(result.JobId) != 32 && len(noteId) > 0 {
 				result.Status = zeppelin.ABORT
-				_ = jarExec.zeppelinClient.DeleteNote(noteId)
+				//_ = jarExec.zeppelinClient.DeleteNote(noteId)
 			}
 		}
 	}()
