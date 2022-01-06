@@ -2,6 +2,7 @@ package flink
 
 import (
 	"context"
+	"github.com/DataWorkbench/common/qerror"
 	"strconv"
 	"strings"
 	"time"
@@ -27,12 +28,27 @@ func NewScalaExecutor(bm *BaseExecutor, ctx context.Context) *ScalaExecutor {
 func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.RunJob) (*zeppelin.ParagraphResult, error) {
 	var result *zeppelin.ParagraphResult
 	var noteId string
+	var err error
 	defer func() {
-		if result != nil && result.Status != zeppelin.RUNNING && len(noteId) > 0 {
-			_ = scalaExec.zeppelinClient.DeleteNote(noteId)
+		if err == nil {
+			if result != nil && result.Status != zeppelin.RUNNING && len(noteId) > 0 {
+				if result.Status == zeppelin.ERROR && len(result.Results) > 0 {
+					for _, re := range result.Results {
+						if strings.EqualFold(re.Type, "TEXT") && strings.Contains(re.Data, "Caused by: java.net.ConnectException: Connection refused") {
+							err = qerror.FlinkRestError
+						}
+					}
+				}
+				_ = scalaExec.zeppelinClient.DeleteNote(noteId)
+			} else if (result.Status == zeppelin.RUNNING || result.Status == zeppelin.FINISHED) &&
+				len(result.JobId) != 32 && len(noteId) > 0 {
+				result.Status = zeppelin.ABORT
+				_ = scalaExec.zeppelinClient.DeleteNote(noteId)
+			}
 		}
 	}()
-	result, err := scalaExec.preCheck(ctx, info.InstanceId)
+
+	result, err = scalaExec.preCheck(ctx, info.InstanceId)
 	if err != nil {
 		return nil, err
 	} else if result != nil {

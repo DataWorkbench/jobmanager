@@ -84,7 +84,7 @@ func (bm *BaseExecutor) preCheck(ctx context.Context, instanceId string) (*zeppe
 	if jobInfo, err := bm.getResult(ctx, instanceId); err != nil && !errors.Is(err, qerror.ResourceNotExists) {
 		return nil, err
 	} else if jobInfo != nil {
-		if jobInfo.State == model.StreamJobInst_Running || jobInfo.State == model.StreamJobInst_Succeed {
+		if jobInfo.State == model.StreamJobInst_Running || jobInfo.State == model.StreamJobInst_Succeed && len(jobInfo.FlinkId) == 32 {
 			result := zeppelin.ParagraphResult{
 				NoteId:      jobInfo.NoteId,
 				ParagraphId: jobInfo.ParagraphId,
@@ -276,9 +276,16 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.R
 
 func (bm *BaseExecutor) initNote(interceptor string, instanceId string, properties map[string]string) (string, error) {
 	noteId, err := bm.zeppelinClient.CreateNote(instanceId)
+	var notesMap map[string]string
 	if err != nil {
 		if err == qerror.ZeppelinNoteAlreadyExists {
-			_ = bm.zeppelinClient.DeleteNote(instanceId)
+			notesMap, err = bm.zeppelinClient.ListNotes()
+			if err != nil {
+				return "", err
+			}
+			if len(notesMap[instanceId]) > 0 {
+				_ = bm.zeppelinClient.DeleteNote(notesMap[instanceId])
+			}
 			noteId, err = bm.zeppelinClient.CreateNote(instanceId)
 			if err != nil {
 				return "", err
