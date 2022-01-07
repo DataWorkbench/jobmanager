@@ -216,15 +216,18 @@ func (bm *BaseExecutor) getUDFs(ctx context.Context, udfIds []string) ([]*Udf, e
 	return udfCodes, nil
 }
 
-func (bm *BaseExecutor) getUDFJars(udfs []*Udf) string {
-	var executionUdfJars string
+func (bm *BaseExecutor) getUDFJars(spaceId string, udfs []*Udf) string {
+	builder := strings.Builder{}
 	for _, udf := range udfs {
 		if udf.udfType == model.UDFInfo_Java {
-			executionUdfJars += udf.code + ","
+			builder.WriteString("hdfs://hdfs-k8s/" + spaceId + "/" + udf.code + ".jar,")
 		}
 	}
-	executionUdfJars = strings.TrimSuffix(executionUdfJars, ",")
-	return executionUdfJars
+	udfJars := builder.String()
+	if udfJars != "" && len(udfJars) > 0 {
+		udfJars = strings.TrimSuffix(udfJars, ",")
+	}
+	return udfJars
 }
 
 func (bm *BaseExecutor) registerUDF(noteId string, udfs []*Udf) (*zeppelin.ParagraphResult, error) {
@@ -303,7 +306,7 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.R
 		properties["flink.execution.jars"] = executionJars
 	}
 
-	udfJars := bm.getUDFJars(udfs)
+	udfJars := bm.getUDFJars(info.SpaceId, udfs)
 	if udfJars != "" && len(udfJars) > 0 {
 		properties["flink.udf.jars"] = udfJars
 	}
