@@ -63,10 +63,12 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	if err != nil {
 		return nil, err
 	}
+	sqlExec.logger.Info().Msg(fmt.Sprintf("flink job properties is %s", properties)).Fire()
 	noteId, err = sqlExec.initNote("flink", info.GetInstanceId(), properties)
 	if err != nil {
 		return nil, err
 	}
+	sqlExec.logger.Info().Msg("flink job init success").Fire()
 	result, err = sqlExec.registerUDF(noteId, udfs)
 	if err != nil {
 		return nil, err
@@ -97,6 +99,7 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	if result, err = sqlExec.zeppelinClient.Submit("flink", "ssql", noteId, info.GetCode().GetSql().GetCode()); err != nil {
 		return result, err
 	}
+	sqlExec.logger.Info().Msg(fmt.Sprintf("flink job submit finish, tmp status is %s,result is %s", result.Status, result.Results)).Fire()
 	//TODO 异步提交后立马记录一下当前的状态，notebook id，paragraph id
 	if err = sqlExec.preHandle(ctx, info.InstanceId, noteId, result.ParagraphId); err != nil {
 		return nil, err
@@ -127,7 +130,7 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 		if result, err = sqlExec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
 			return result, err
 		}
-		sqlExec.logger.Info().Msg(fmt.Sprintf("query result for instance %s , status %s, result %s", info.InstanceId, result.Status, result.Results))
+		sqlExec.logger.Info().Msg(fmt.Sprintf("query result for instance %s until submit success, status %s, result %s", info.InstanceId, result.Status, result.Results)).Fire()
 		if result.Status.IsFailed() {
 			return result, err
 		}

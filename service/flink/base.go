@@ -367,6 +367,13 @@ func (bm *BaseExecutor) initNote(interceptor string, instanceId string, properti
 		return "", err
 	}
 	if !result.Status.IsFinished() {
+		if len(result.Results) > 0 {
+			for _, re := range result.Results {
+				if strings.EqualFold("TEXT", re.Type) {
+					bm.logger.Warn().Msg(fmt.Sprintf("zeppelin init failed,reason is %s", re.Data)).Fire()
+				}
+			}
+		}
 		return "", qerror.ZeppelinInitFailed
 	}
 	return noteId, nil
