@@ -79,11 +79,11 @@ func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.RunJob) (
 	if result, err = scalaExec.zeppelinClient.Submit("flink", "", noteId, info.GetCode().GetScala().GetCode()); err != nil {
 		return result, err
 	}
-	if err = scalaExec.PreHandle(ctx, info.InstanceId, noteId, result.ParagraphId); err != nil {
+	if err = scalaExec.preHandle(ctx, info.InstanceId, noteId, result.ParagraphId); err != nil {
 		return nil, err
 	}
 	defer func() {
-		scalaExec.PostHandle(ctx, info.InstanceId, noteId, result)
+		scalaExec.postHandle(ctx, info.InstanceId, noteId, result)
 	}()
 	for {
 		if result, err = scalaExec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {

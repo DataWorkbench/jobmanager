@@ -29,21 +29,9 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	var noteId string
 	var err error
 	defer func() {
-		if err == nil {
-			if result != nil && result.Status != zeppelin.RUNNING && len(noteId) > 0 {
-				if result.Status == zeppelin.ERROR && len(result.Results) > 0 {
-					for _, re := range result.Results {
-						if strings.EqualFold(re.Type, "TEXT") && strings.Contains(re.Data, "Caused by: java.net.ConnectException: Connection refused") {
-							err = qerror.FlinkRestError
-						}
-					}
-				}
-				//_ = jarExec.zeppelinClient.DeleteNote(noteId)
-			} else if (result.Status == zeppelin.RUNNING || result.Status == zeppelin.FINISHED) &&
-				len(result.JobId) != 32 && len(noteId) > 0 {
-				result.Status = zeppelin.ABORT
-				//_ = jarExec.zeppelinClient.DeleteNote(noteId)
-			}
+		//TODO 如果notebook已经被创建，删除notebook
+		if noteId != "" && len(noteId) > 0 {
+			_ = jarExec.zeppelinClient.DeleteNote(noteId)
 		}
 	}()
 
@@ -102,32 +90,52 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	if err != nil {
 		return nil, err
 	}
-	if err = jarExec.PreHandle(ctx, info.InstanceId, noteId, result.ParagraphId); err != nil {
+	if err = jarExec.preHandle(ctx, info.InstanceId, noteId, result.ParagraphId); err != nil {
 		return nil, err
 	}
 	defer func() {
-		jarExec.PostHandle(ctx, info.InstanceId, noteId, result)
+		if err == nil {
+			if result != nil && len(noteId) > 0 {
+				// TODO 如果不是Running状态，判断是否是Flink集群导致的异常，设置异常，返回
+				if !result.Status.IsRunning() {
+					for _, re := range result.Results {
+						// 如果 返回没有异常
+						if strings.EqualFold(re.Type, "TEXT") && strings.Contains(re.Data, "Caused by: java.net.ConnectException: Connection refused") {
+							jarExec.logger.Error().Msg(fmt.Sprintf("flink cluster rest time out,cluster id is %s,job instanceId is %s",
+								info.GetArgs().ClusterId, info.InstanceId))
+							err = qerror.FlinkRestError
+							return
+						}
+					}
+				}
+			}
+			// TODO 如果没有异常，则结果写如数据库
+			jarExec.postHandle(ctx, info.InstanceId, noteId, result)
+		}
 	}()
 	for {
 		if result, err = jarExec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
 			return nil, err
 		}
+		//TODO 判断是否为Running或Pending
 		if !result.Status.IsRunning() && !result.Status.IsPending() {
+			//TODO 判断是否拿到jobId
 			if result.Results != nil && len(result.Results) > 0 {
-				data := result.Results[0].Data
-				jobInfo := strings.Split(data, "JobID ")
-				if len(jobInfo) == 2 {
-					res := strings.Split(jobInfo[1], "\n")
-					if len(res) > 0 && len(res[0]) == 32 {
-						result.JobId = res[0]
-						result.Status = zeppelin.RUNNING
-						return result, nil
+				for _, re := range result.Results {
+					jobInfo := strings.Split(re.Data, "JobID ")
+					if len(jobInfo) == 2 {
+						res := strings.Split(jobInfo[1], "\n")
+						if len(res) > 0 && len(res[0]) == 32 {
+							result.JobId = res[0]
+							result.Status = zeppelin.RUNNING
+							return result, nil
+						}
 					}
 				}
-				result.Status = zeppelin.ABORT
-				return result, nil
+				//TODO 拿不到返回ERROR
+				result.Status = zeppelin.ERROR
 			}
-			return result, err
+			return result, nil
 		}
 	}
 }

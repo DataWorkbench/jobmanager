@@ -79,11 +79,11 @@ func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.RunJob) (*z
 	if result, err = pyExec.zeppelinClient.Submit("flink", "ipyflink", noteId, info.GetCode().GetPython().GetCode()); err != nil {
 		return result, err
 	}
-	if err = pyExec.PreHandle(ctx, info.InstanceId, noteId, result.ParagraphId); err != nil {
+	if err = pyExec.preHandle(ctx, info.InstanceId, noteId, result.ParagraphId); err != nil {
 		return nil, err
 	}
 	defer func() {
-		pyExec.PostHandle(ctx, info.InstanceId, noteId, result)
+		pyExec.postHandle(ctx, info.InstanceId, noteId, result)
 	}()
 	for {
 		if result, err = pyExec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {

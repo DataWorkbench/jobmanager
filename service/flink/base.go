@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/DataWorkbench/common/constants"
 	"github.com/DataWorkbench/common/flink"
@@ -107,7 +108,7 @@ func (bm *BaseExecutor) preCheck(ctx context.Context, instanceId string) (*zeppe
 	return nil, nil
 }
 
-func (bm *BaseExecutor) PreHandle(ctx context.Context, instanceId string, noteId string, paragraphId string) error {
+func (bm *BaseExecutor) preHandle(ctx context.Context, instanceId string, noteId string, paragraphId string) error {
 	jobInfo := model.JobInfo{
 		InstanceId:  instanceId,
 		NoteId:      noteId,
@@ -117,7 +118,7 @@ func (bm *BaseExecutor) PreHandle(ctx context.Context, instanceId string, noteId
 	return bm.upsertResult(ctx, &jobInfo)
 }
 
-func (bm *BaseExecutor) PostHandle(ctx context.Context, instanceId string, noteId string,
+func (bm *BaseExecutor) postHandle(ctx context.Context, instanceId string, noteId string,
 	result *zeppelin.ParagraphResult) {
 	if result != nil && (len(result.Results) > 0 || len(result.JobId) == 32) {
 		if len(result.JobId) != 32 && (result.Status.IsRunning() || result.Status.IsPending()) {
@@ -163,7 +164,7 @@ func (bm *BaseExecutor) getResult(ctx context.Context, instanceId string) (*mode
 	return &jobInfo, nil
 }
 
-func (bm *BaseExecutor) getConnectors(builtInConnectors []string, flinkVersion string) string {
+func (bm *BaseExecutor) getBaseConnectors(builtInConnectors []string, flinkVersion string) string {
 	var libDir = "/zeppelin/flink/1.12_lib/"
 	var executeJars string
 	connectorSet := map[string]string{}
@@ -178,6 +179,18 @@ func (bm *BaseExecutor) getConnectors(builtInConnectors []string, flinkVersion s
 		executeJars += jar
 	}
 	executeJars = strings.TrimSuffix(executeJars, ",")
+	return executeJars
+}
+
+func (bm *BaseExecutor) getUserDefineConnectors(spaceId string, resIds []string) string {
+	builder := strings.Builder{}
+	for _, id := range resIds {
+		builder.WriteString("/" + spaceId + "/" + id + ".jar,")
+	}
+	executeJars := builder.String()
+	if executeJars != "" && len(executeJars) > 0 {
+		executeJars = strings.TrimSuffix(executeJars, ",")
+	}
 	return executeJars
 }
 
@@ -223,14 +236,26 @@ func (bm *BaseExecutor) registerUDF(noteId string, udfs []*Udf) (*zeppelin.Parag
 	for _, udf := range udfs {
 		switch udf.udfType {
 		case model.UDFInfo_Scala:
-			result, err = bm.zeppelinClient.Execute("flink", "", noteId, udf.code)
-			if err != nil {
-				return nil, err
+			start := time.Now().Unix()
+			for (start - time.Now().Unix()) < 5000 {
+				result, err = bm.zeppelinClient.Submit("flink", "", noteId, udf.code)
+				if err != nil {
+					return nil, err
+				}
+				if !result.Status.IsRunning() && !result.Status.IsPending() {
+					break
+				}
 			}
 		case model.UDFInfo_Python:
-			result, err = bm.zeppelinClient.Execute("flink", "ipyflink", noteId, udf.code)
-			if err != nil {
-				return nil, err
+			start := time.Now().Unix()
+			for (start - time.Now().Unix()) < 5000 {
+				result, err = bm.zeppelinClient.Submit("flink", "ipyflink", noteId, udf.code)
+				if err != nil {
+					return nil, err
+				}
+				if !result.Status.IsRunning() && !result.Status.IsPending() {
+					break
+				}
 			}
 		}
 	}
@@ -265,10 +290,18 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.R
 	//properties["flink.execution.remote.port"] = "8081"
 	//flinkVersion := "flink-1.12.3-scala_2.11"
 
-	executionJars := bm.getConnectors(info.GetArgs().GetBuiltInConnectors(), flinkVersion)
+	var executionJars string
+	baseConnectors := bm.getBaseConnectors(info.GetArgs().GetBuiltInConnectors(), flinkVersion)
+	userConnectors := bm.getUserDefineConnectors(info.SpaceId, info.GetArgs().GetConnectors())
+	if baseConnectors != "" && len(baseConnectors) > 0 {
+		executionJars = baseConnectors + "," + userConnectors
+	} else if userConnectors != "" && len(userConnectors) > 0 {
+		executionJars = userConnectors
+	}
 	if executionJars != "" && len(executionJars) > 0 {
 		properties["flink.execution.jars"] = executionJars
 	}
+
 	udfJars := bm.getUDFJars(udfs)
 	if udfJars != "" && len(udfJars) > 0 {
 		properties["flink.udf.jars"] = udfJars
@@ -278,12 +311,17 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.R
 
 func (bm *BaseExecutor) initNote(interceptor string, instanceId string, properties map[string]string) (string, error) {
 	var result *zeppelin.ParagraphResult
-	noteId, err := bm.zeppelinClient.CreateNote(instanceId)
+	var noteId string
+	var err error
 	defer func() {
-		if len(noteId) > 0 && (err != nil || (result != nil && result.Status != zeppelin.FINISHED)) {
+		if err == nil && len(noteId) > 0 && result.Status != zeppelin.FINISHED {
 			_ = bm.zeppelinClient.DeleteNote(noteId)
 		}
 	}()
+	noteId, err = bm.zeppelinClient.CreateNote(instanceId)
+	if err != nil {
+		return "", err
+	}
 	var notesMap map[string]string
 	if err != nil {
 		if err == qerror.ZeppelinNoteAlreadyExists {

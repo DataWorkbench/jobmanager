@@ -3,6 +3,7 @@ package flink
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/qerror"
 	"github.com/DataWorkbench/common/zeppelin"
@@ -31,19 +32,16 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	var noteId string
 	var err error
 	defer func() {
-		if err == nil {
-			if result != nil && result.Status != zeppelin.RUNNING && len(noteId) > 0 {
-				if result.Status == zeppelin.ERROR && len(result.Results) > 0 {
-					for _, re := range result.Results {
-						if strings.EqualFold(re.Type, "TEXT") && strings.Contains(re.Data, "Caused by: java.net.ConnectException: Connection refused") {
-							err = qerror.FlinkRestError
-						}
-					}
+		//TODO 如果 notebook已经被创建
+		if noteId != "" && len(noteId) > 0 {
+			// TODO 如果没有异常
+			if err == nil {
+				// TODO 判断结果 不是Running，删除notebook
+				if result != nil && !result.Status.IsRunning() {
+					_ = sqlExec.zeppelinClient.DeleteNote(noteId)
 				}
-				_ = sqlExec.zeppelinClient.DeleteNote(noteId)
-			} else if (result.Status == zeppelin.RUNNING || result.Status == zeppelin.FINISHED) &&
-				len(result.JobId) != 32 && len(noteId) > 0 {
-				result.Status = zeppelin.ABORT
+				//TODO 如果有异常 直接删除notebook
+			} else {
 				_ = sqlExec.zeppelinClient.DeleteNote(noteId)
 			}
 		}
@@ -80,7 +78,9 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	}
 	if strings.Contains(strings.ToLower(info.GetCode().GetSql().GetCode()), "insert") {
 		jobProp["runAsOne"] = "true"
-	} else if !strings.Contains(strings.ToLower(info.GetCode().GetSql().GetCode()), "select") {
+	} else if strings.Contains(strings.ToLower(info.GetCode().GetSql().GetCode()), "select") {
+		jobProp["type"] = "update"
+	} else {
 		//TODO 这种没有dml的sql 也会成功但是没有jobId，这里按照Finished 处理
 		result = &zeppelin.ParagraphResult{
 			NoteId:      noteId,
@@ -97,11 +97,31 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	if result, err = sqlExec.zeppelinClient.Submit("flink", "ssql", noteId, info.GetCode().GetSql().GetCode()); err != nil {
 		return result, err
 	}
-	if err = sqlExec.PreHandle(ctx, info.InstanceId, noteId, result.ParagraphId); err != nil {
+	//TODO 异步提交后立马记录一下当前的状态，notebook id，paragraph id
+	if err = sqlExec.preHandle(ctx, info.InstanceId, noteId, result.ParagraphId); err != nil {
 		return nil, err
 	}
 	defer func() {
-		sqlExec.PostHandle(ctx, info.InstanceId, noteId, result)
+		if err == nil {
+			if result != nil && len(noteId) > 0 {
+				// TODO 如果结束状态不是Running，去结果找是否是因为连接Flink超时导致的异常，如果只设置err为 FlinkRestError，返回
+				if !result.Status.IsRunning() {
+					for _, re := range result.Results {
+						if strings.EqualFold(re.Type, "TEXT") && strings.Contains(re.Data, "Caused by: java.net.ConnectException: Connection refused") {
+							sqlExec.logger.Error().Msg(fmt.Sprintf("flink cluster rest time out,cluster id is %s,job instanceId is %s",
+								info.GetArgs().ClusterId, info.InstanceId))
+							err = qerror.FlinkRestError
+							return
+						}
+					}
+					//TODO 如果结果状态为Running，但是JobId长度不符合
+				} else if len(result.JobId) != 32 {
+					result.Status = zeppelin.ERROR
+				}
+			}
+			// TODO 如果没有异常，则结果写如数据库
+			sqlExec.postHandle(ctx, info.InstanceId, noteId, result)
+		}
 	}()
 	for {
 		if result, err = sqlExec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
