@@ -83,6 +83,7 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	} else if strings.Contains(strings.ToLower(info.GetCode().GetSql().GetCode()), "select") {
 		jobProp["type"] = "update"
 	} else {
+		sqlExec.logger.Info().Msg("this sql does not has dml command.")
 		//TODO 这种没有dml的sql 也会成功但是没有jobId，这里按照Finished 处理
 		result = &zeppelin.ParagraphResult{
 			NoteId:      noteId,
@@ -96,14 +97,17 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 		return result, nil
 	}
 
+	sqlExec.logger.Info().Msg("flink job submit start.").Fire()
 	if result, err = sqlExec.zeppelinClient.Submit("flink", "ssql", noteId, info.GetCode().GetSql().GetCode()); err != nil {
 		return result, err
 	}
-	sqlExec.logger.Info().Msg(fmt.Sprintf("flink job submit finish, tmp status is %s,result is %s", result.Status, result.Results)).Fire()
+	sqlExec.logger.Info().Msg(fmt.Sprintf("flink job submit finish, tmp status is %s,result is %s.", result.Status, result.Results)).Fire()
 	//TODO 异步提交后立马记录一下当前的状态，notebook id，paragraph id
 	if err = sqlExec.preHandle(ctx, info.InstanceId, noteId, result.ParagraphId); err != nil {
 		return nil, err
 	}
+	sqlExec.logger.Info().Msg(fmt.Sprintf("insert pre submit success, instance_id is %s ,note_id is %s ,paragraph_id is %s", info.InstanceId, noteId, result.ParagraphId)).Fire()
+
 	defer func() {
 		if err == nil {
 			if result != nil && len(noteId) > 0 {
@@ -128,16 +132,17 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	}()
 	for {
 		if result, err = sqlExec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
-			return result, err
+			return nil, err
 		}
 		sqlExec.logger.Info().Msg(fmt.Sprintf("query result for instance %s until submit success, status %s, result %s", info.InstanceId, result.Status, result.Results)).Fire()
 		if result.Status.IsFailed() {
-			return result, err
+			return result, nil
 		}
 		if len(result.JobUrls) > 0 {
 			jobUrl := result.JobUrls[0]
 			if len(jobUrl)-1-strings.LastIndex(jobUrl, "/") == 32 {
 				result.JobId = jobUrl[strings.LastIndex(jobUrl, "/")+1:]
+				sqlExec.logger.Info().Msg(fmt.Sprintf("fetch flink job id success, job id is %s", result.JobId)).Fire()
 			}
 			return result, nil
 		}
