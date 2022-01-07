@@ -3,7 +3,7 @@ module github.com/DataWorkbench/jobmanager
 go 1.15
 
 require (
-	github.com/DataWorkbench/common v0.0.0-20220107075937-7feca111c914
+	github.com/DataWorkbench/common v0.0.0-20220107083439-baa97bc531d4
 	github.com/DataWorkbench/glog v0.0.0-20210809050640-4960fd6de6ab
 	github.com/DataWorkbench/gproto v0.0.0-20220106011828-948d4565a6b2
 	github.com/DataWorkbench/loader v0.0.0-20201119073611-6f210eb11a8c

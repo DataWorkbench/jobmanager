@@ -98,7 +98,7 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	}
 
 	sqlExec.logger.Info().Msg("flink job submit start.").Fire()
-	if result, err = sqlExec.zeppelinClient.Submit("flink", "ssql", noteId, info.GetCode().GetSql().GetCode()); err != nil {
+	if result, err = sqlExec.zeppelinClient.SubmitWithProperties("flink", "ssql", noteId, info.GetCode().GetSql().GetCode(), jobProp); err != nil {
 		return result, err
 	}
 	sqlExec.logger.Info().Msg(fmt.Sprintf("flink job submit finish, tmp status is %s,result is %s.", result.Status, result.Results)).Fire()
