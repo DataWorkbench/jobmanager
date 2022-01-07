@@ -236,10 +236,12 @@ func (bm *BaseExecutor) registerUDF(noteId string, udfs []*Udf) (*zeppelin.Parag
 	for _, udf := range udfs {
 		switch udf.udfType {
 		case model.UDFInfo_Scala:
+			if result, err = bm.zeppelinClient.Submit("flink", "", noteId, udf.code); err != nil {
+				return nil, err
+			}
 			start := time.Now().Unix()
 			for (start - time.Now().Unix()) < 5000 {
-				result, err = bm.zeppelinClient.Submit("flink", "", noteId, udf.code)
-				if err != nil {
+				if result, err = bm.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
 					return nil, err
 				}
 				if !result.Status.IsRunning() && !result.Status.IsPending() {
@@ -247,10 +249,12 @@ func (bm *BaseExecutor) registerUDF(noteId string, udfs []*Udf) (*zeppelin.Parag
 				}
 			}
 		case model.UDFInfo_Python:
+			if result, err = bm.zeppelinClient.Submit("flink", "ipyflink", noteId, udf.code); err != nil {
+				return nil, err
+			}
 			start := time.Now().Unix()
 			for (start - time.Now().Unix()) < 5000 {
-				result, err = bm.zeppelinClient.Submit("flink", "ipyflink", noteId, udf.code)
-				if err != nil {
+				if result, err = bm.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
 					return nil, err
 				}
 				if !result.Status.IsRunning() && !result.Status.IsPending() {
