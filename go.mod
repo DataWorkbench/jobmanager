@@ -16,3 +16,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	gorm.io/gorm v1.20.6
 )
+
+replace (
+	github.com/DataWorkbench/common v0.0.0-20220106052024-1f4caa93a761 => /Users/apple/develop/go/src/tmp/common
+)

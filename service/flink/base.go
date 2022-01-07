@@ -162,14 +162,14 @@ func (bm *BaseExecutor) getResult(ctx context.Context, instanceId string) (*mode
 }
 
 func (bm *BaseExecutor) getBaseConnectors(builtInConnectors []string, flinkVersion string) string {
-	var libDir = "/zeppelin/flink/1.12_lib/"
+	libDir := constants.FlinkDefaultConnectorPath[flinkVersion]
 	var executeJars string
 	connectorSet := map[string]string{}
 	connectorJarMap := constants.FlinkConnectorJarMap[flinkVersion]
 	for _, connector := range builtInConnectors {
 		jars := connectorJarMap[connector]
 		for _, jar := range jars {
-			connectorSet[libDir+jar+","] = ""
+			connectorSet[libDir+"/"+jar+","] = ""
 		}
 	}
 	for jar := range connectorSet {
@@ -271,12 +271,12 @@ func (bm *BaseExecutor) registerUDF(noteId string, udfs []*Udf) (*zeppelin.Parag
 
 func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.RunJob, udfs []*Udf) (map[string]string, error) {
 	properties := map[string]string{}
-	properties["FLINK_HOME"] = "/zeppelin/flink/flink-1.12.3"
 
 	flinkUrl, flinkVersion, err := bm.engineClient.GetEngineInfo(ctx, info.GetSpaceId(), info.GetArgs().GetClusterId())
 	if err != nil {
 		return nil, err
 	}
+	properties["FLINK_HOME"] = constants.FlinkClientHome[flinkVersion]
 	host := flinkUrl[:strings.Index(flinkUrl, ":")]
 	port := flinkUrl[strings.Index(flinkUrl, ":")+1:]
 	if host != "" && len(host) > 0 && port != "" && len(port) > 0 {
@@ -306,7 +306,7 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.R
 		properties["flink.execution.jars"] = executionJars
 	}
 
-	udfJars := bm.getUDFJars(info.SpaceId, udfs)
+	udfJars := bm.getUDFJars(info.GetSpaceId(), udfs)
 	if udfJars != "" && len(udfJars) > 0 {
 		properties["flink.udf.jars"] = udfJars
 	}

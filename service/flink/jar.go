@@ -60,7 +60,7 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	if err != nil {
 		return nil, err
 	}
-	jars := jarExec.getUDFJars(udfs)
+	jars := jarExec.getUDFJars(info.GetSpaceId(), udfs)
 	builder := strings.Builder{}
 	builder.WriteString(fmt.Sprintf("hdfs dfs -get %v %v\n", jarUrl, localJarPath))
 	var udfJars []string
