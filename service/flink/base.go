@@ -324,22 +324,16 @@ func (bm *BaseExecutor) initNote(interceptor string, instanceId string, properti
 			_ = bm.zeppelinClient.DeleteNote(noteId)
 		}
 	}()
-	noteId, err = bm.zeppelinClient.CreateNote(instanceId)
-	if err != nil {
-		return "", err
-	}
-	//TODO 创建了notebook 就记录一下
-	if err = bm.preHandle(bm.ctx, instanceId, noteId, ""); err != nil {
-		return "", err
-	}
-	var notesMap map[string]string
-	if err != nil {
+	if noteId, err = bm.zeppelinClient.CreateNote(instanceId); err != nil {
+		var notesMap map[string]string
 		if err == qerror.ZeppelinNoteAlreadyExists {
 			notesMap, err = bm.zeppelinClient.ListNotes()
 			if err != nil {
 				return "", err
 			}
-			if len(notesMap[instanceId]) > 0 {
+			bm.logger.Warn().Msg(fmt.Sprintf("note id exists list notes map is %s", notesMap))
+			if len(notesMap["/"+instanceId]) > 0 {
+				bm.logger.Warn().Msg(fmt.Sprintf("delete note name %s,id %s", "/"+instanceId, notesMap["/"+instanceId]))
 				_ = bm.zeppelinClient.DeleteNote(notesMap[instanceId])
 			}
 			noteId, err = bm.zeppelinClient.CreateNote(instanceId)
@@ -349,6 +343,10 @@ func (bm *BaseExecutor) initNote(interceptor string, instanceId string, properti
 		} else {
 			return "", err
 		}
+	}
+	//TODO 创建了notebook 就记录一下
+	if err = bm.preHandle(bm.ctx, instanceId, noteId, ""); err != nil {
+		return "", err
 	}
 	builder := strings.Builder{}
 	builder.WriteString("%" + interceptor + ".conf\n")
