@@ -127,6 +127,7 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 		if result, err = sqlExec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
 			return result, err
 		}
+		sqlExec.logger.Info().Msg(fmt.Sprintf("query result for instance %s , status %s, result %s", info.InstanceId, result.Status, result.Results))
 		if result.Status.IsFailed() {
 			return result, err
 		}

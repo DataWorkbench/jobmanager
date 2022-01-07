@@ -117,6 +117,7 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 		if result, err = jarExec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
 			return nil, err
 		}
+		jarExec.logger.Info().Msg(fmt.Sprintf("query result for instance %s , status %s, result %s", info.InstanceId, result.Status, result.Results))
 		//TODO 判断是否为Running或Pending
 		if !result.Status.IsRunning() && !result.Status.IsPending() {
 			//TODO 判断是否拿到jobId

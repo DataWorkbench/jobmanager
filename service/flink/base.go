@@ -185,7 +185,7 @@ func (bm *BaseExecutor) getBaseConnectors(builtInConnectors []string, flinkVersi
 func (bm *BaseExecutor) getUserDefineConnectors(spaceId string, resIds []string) string {
 	builder := strings.Builder{}
 	for _, id := range resIds {
-		builder.WriteString("/" + spaceId + "/" + id + ".jar,")
+		builder.WriteString("hdfs://hdfs-k8s/" + spaceId + "/" + id + ".jar,")
 	}
 	executeJars := builder.String()
 	if executeJars != "" && len(executeJars) > 0 {
