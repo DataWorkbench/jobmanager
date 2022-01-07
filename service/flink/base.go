@@ -395,6 +395,9 @@ func (bm *BaseExecutor) getJobInfo(ctx context.Context, instanceId string, space
 func (bm *BaseExecutor) release(ctx context.Context, instanceId string) error {
 	result, err := bm.getResult(ctx, instanceId)
 	if err != nil {
+		if errors.Is(err, qerror.ResourceNotExists) {
+			return nil
+		}
 		return err
 	}
 	if len(result.NoteId) > 0 {
