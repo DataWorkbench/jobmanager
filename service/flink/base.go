@@ -87,6 +87,7 @@ func (bm *BaseExecutor) preCheck(ctx context.Context, instanceId string) (*zeppe
 	if jobInfo, err := bm.getResult(ctx, instanceId); err != nil && !errors.Is(err, qerror.ResourceNotExists) {
 		return nil, err
 	} else if jobInfo != nil {
+		// TODO 如果数据库有数据，则判断是否是running或finished 并且是否有flink job id，满足既返回
 		if jobInfo.State == model.StreamJobInst_Running || jobInfo.State == model.StreamJobInst_Succeed && len(jobInfo.FlinkId) == 32 {
 			result := zeppelin.ParagraphResult{
 				NoteId:      jobInfo.NoteId,
@@ -98,6 +99,7 @@ func (bm *BaseExecutor) preCheck(ctx context.Context, instanceId string) (*zeppe
 				JobId:       jobInfo.FlinkId,
 			}
 			return &result, err
+			// TODO 删除notebook
 		} else if len(jobInfo.NoteId) > 0 {
 			_ = bm.zeppelinClient.DeleteNote(jobInfo.NoteId)
 		}
@@ -324,6 +326,10 @@ func (bm *BaseExecutor) initNote(interceptor string, instanceId string, properti
 	}()
 	noteId, err = bm.zeppelinClient.CreateNote(instanceId)
 	if err != nil {
+		return "", err
+	}
+	//TODO 创建了notebook 就记录一下
+	if err = bm.preHandle(bm.ctx, instanceId, noteId, ""); err != nil {
 		return "", err
 	}
 	var notesMap map[string]string
