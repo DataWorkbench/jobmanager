@@ -320,8 +320,9 @@ func (bm *BaseExecutor) initNote(interceptor string, instanceId string, properti
 	var noteId string
 	var err error
 	defer func() {
-		if err == nil && len(noteId) > 0 && result.Status != zeppelin.FINISHED {
+		if len(noteId) > 0 && (result == nil || result.Status != zeppelin.FINISHED) {
 			_ = bm.zeppelinClient.DeleteNote(noteId)
+			err = qerror.ZeppelinInitFailed
 		}
 	}()
 	if noteId, err = bm.zeppelinClient.CreateNote(instanceId); err != nil {
