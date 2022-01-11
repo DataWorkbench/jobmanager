@@ -184,6 +184,9 @@ func (sqlExec *SqlExecutor) Validate(jobCode *model.StreamJobCode) (bool, string
 	if result, err := sqlExec.zeppelinClient.Execute("sh", "", noteId, builder.String()); err != nil {
 		return false, "", err
 	} else if result.Results != nil && len(result.Results) > 0 {
+		if strings.Contains(result.Results[0].Data, "sql") {
+			return false, "Invalid sql statements, please check you code.", nil
+		}
 		return false, result.Results[0].Data, nil
 	}
 	return true, "", nil
