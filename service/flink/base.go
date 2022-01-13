@@ -336,7 +336,7 @@ func (bm *BaseExecutor) initNote(ctx context.Context, interceptor string, instan
 		logger.Warn().Msg(fmt.Sprintf("note id exists list notes map is %s", notesMap)).Fire()
 		if len(notesMap["/"+instanceId]) > 0 {
 			logger.Warn().Msg(fmt.Sprintf("delete note name %s,id %s", "/"+instanceId, notesMap["/"+instanceId])).Fire()
-			if err = bm.zeppelinClient.DeleteNote(notesMap[instanceId]); err != nil {
+			if err = bm.zeppelinClient.DeleteNote(notesMap["/"+instanceId]); err != nil {
 				logger.Warn().Msg(fmt.Sprintf("delete note %s failed,note name %s ,reason is %s", noteId, instanceId, err.Error())).Fire()
 			}
 		}
