@@ -315,7 +315,8 @@ func (bm *BaseExecutor) getGlobalProperties(ctx context.Context, info *request.R
 	return properties, nil
 }
 
-func (bm *BaseExecutor) initNote(interceptor string, instanceId string, properties map[string]string) (string, error) {
+func (bm *BaseExecutor) initNote(ctx context.Context, interceptor string, instanceId string, properties map[string]string) (string, error) {
+	logger := glog.FromContext(ctx)
 	var result *zeppelin.ParagraphResult
 	var noteId string
 	var err error
@@ -332,9 +333,9 @@ func (bm *BaseExecutor) initNote(interceptor string, instanceId string, properti
 			if err != nil {
 				return "", err
 			}
-			bm.logger.Warn().Msg(fmt.Sprintf("note id exists list notes map is %s", notesMap))
+			logger.Warn().Msg(fmt.Sprintf("note id exists list notes map is %s", notesMap)).Fire()
 			if len(notesMap["/"+instanceId]) > 0 {
-				bm.logger.Warn().Msg(fmt.Sprintf("delete note name %s,id %s", "/"+instanceId, notesMap["/"+instanceId]))
+				logger.Warn().Msg(fmt.Sprintf("delete note name %s,id %s", "/"+instanceId, notesMap["/"+instanceId])).Fire()
 				_ = bm.zeppelinClient.DeleteNote(notesMap[instanceId])
 			}
 			noteId, err = bm.zeppelinClient.CreateNote(instanceId)
