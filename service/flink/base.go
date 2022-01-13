@@ -326,29 +326,23 @@ func (bm *BaseExecutor) initNote(ctx context.Context, interceptor string, instan
 			err = qerror.ZeppelinInitFailed
 		}
 	}()
-	fmt.Println("=====================================开始创建note=================================================")
 	if noteId, err = bm.zeppelinClient.CreateNote(instanceId); err != nil {
-		fmt.Println("=====================================创建异常=================================================")
-		fmt.Println(err.Error())
 		var notesMap map[string]string
 		notesMap, err = bm.zeppelinClient.ListNotes()
 		if err != nil {
-			fmt.Println("=====================================查看异常=================================================")
 			fmt.Println(err.Error())
 			return "", err
 		}
-		fmt.Println("=====================================开始打印note信息=================================================")
-		for k, v := range notesMap {
-			fmt.Println(k, v)
-		}
-		fmt.Println("=====================================查看note结束=================================================")
 		logger.Warn().Msg(fmt.Sprintf("note id exists list notes map is %s", notesMap)).Fire()
 		if len(notesMap["/"+instanceId]) > 0 {
 			logger.Warn().Msg(fmt.Sprintf("delete note name %s,id %s", "/"+instanceId, notesMap["/"+instanceId])).Fire()
-			_ = bm.zeppelinClient.DeleteNote(notesMap[instanceId])
+			if err = bm.zeppelinClient.DeleteNote(notesMap[instanceId]); err != nil {
+				logger.Warn().Msg(fmt.Sprintf("delete note %s failed,note name %s ,reason is %s", noteId, instanceId, err.Error())).Fire()
+			}
 		}
 		noteId, err = bm.zeppelinClient.CreateNote(instanceId)
 		if err != nil {
+			logger.Warn().Msg(fmt.Sprintf("recreate note failed,note name %s ,reason is %s", instanceId, err.Error())).Fire()
 			return "", err
 		}
 	}
@@ -363,19 +357,23 @@ func (bm *BaseExecutor) initNote(ctx context.Context, interceptor string, instan
 	}
 	confParagraphId, err := bm.zeppelinClient.AddParagraph(noteId, "conf", builder.String())
 	if err != nil {
+		logger.Warn().Msg(fmt.Sprintf("add conf paragraph failed,note id %s ,reason is %s", noteId, err.Error())).Fire()
 		return "", err
 	}
 	if _, err = bm.zeppelinClient.ExecuteParagraph(noteId, confParagraphId); err != nil {
+		logger.Warn().Msg(fmt.Sprintf("execute conf paragraph failed,note id %s ,reason is %s", noteId, err.Error())).Fire()
 		return "", err
 	}
 	builder.Reset()
 	builder.WriteString("%" + interceptor + "(init=true)")
 	initParagraphId, err := bm.zeppelinClient.AddParagraph(noteId, "init", builder.String())
 	if err != nil {
+		logger.Warn().Msg(fmt.Sprintf("add init paragraph failed,note id %s ,reason is %s", noteId, err.Error())).Fire()
 		return "", err
 	}
 
 	if result, err = bm.zeppelinClient.ExecuteParagraph(noteId, initParagraphId); err != nil {
+		logger.Warn().Msg(fmt.Sprintf("execute init paragraph failed,note id %s ,reason is %s", noteId, err.Error())).Fire()
 		return "", err
 	}
 	if !result.Status.IsFinished() {
