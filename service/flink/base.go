@@ -326,11 +326,21 @@ func (bm *BaseExecutor) initNote(ctx context.Context, interceptor string, instan
 			err = qerror.ZeppelinInitFailed
 		}
 	}()
+	fmt.Println("=====================================开始创建note=================================================")
 	if noteId, err = bm.zeppelinClient.CreateNote(instanceId); err != nil {
+		fmt.Println("=====================================创建异常=================================================")
+		fmt.Println(err.Error())
 		var notesMap map[string]string
 		if err == qerror.ZeppelinNoteAlreadyExists {
+			fmt.Println("=====================================开始查看note=================================================")
 			notesMap, err = bm.zeppelinClient.ListNotes()
+			for k, v := range notesMap {
+				fmt.Println(k, v)
+			}
+			fmt.Println("=====================================查看note结束=================================================")
 			if err != nil {
+				fmt.Println("=====================================查看异常=================================================")
+				fmt.Println(err.Error())
 				return "", err
 			}
 			logger.Warn().Msg(fmt.Sprintf("note id exists list notes map is %s", notesMap)).Fire()
