@@ -64,7 +64,7 @@ func (sqlExec *SqlExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 		return nil, err
 	}
 	sqlExec.logger.Info().Msg(fmt.Sprintf("flink job properties is %s", properties)).Fire()
-	noteId, err = sqlExec.initNote("flink", info.GetInstanceId(), properties)
+	noteId, err = sqlExec.initNote(ctx,"flink", info.GetInstanceId(), properties)
 	if err != nil {
 		return nil, err
 	}

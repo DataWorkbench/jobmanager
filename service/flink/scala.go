@@ -63,7 +63,7 @@ func (scalaExec *ScalaExecutor) Run(ctx context.Context, info *request.RunJob) (
 	if err != nil {
 		return nil, err
 	}
-	noteId, err = scalaExec.initNote("flink", info.GetInstanceId(), properties)
+	noteId, err = scalaExec.initNote(ctx,"flink", info.GetInstanceId(), properties)
 	if err != nil {
 		return nil, err
 	}

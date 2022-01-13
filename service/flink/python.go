@@ -63,7 +63,7 @@ func (pyExec *PythonExecutor) Run(ctx context.Context, info *request.RunJob) (*z
 	if err != nil {
 		return nil, err
 	}
-	noteId, err = pyExec.initNote("flink", info.GetInstanceId(), properties)
+	noteId, err = pyExec.initNote(ctx,"flink", info.GetInstanceId(), properties)
 	if err != nil {
 		return nil, err
 	}

@@ -81,7 +81,7 @@ func (jarExec *JarExecutor) Run(ctx context.Context, info *request.RunJob) (*zep
 	}
 	builder.WriteString(fmt.Sprintf(" %s %s", localJarPath, jar.GetJarArgs()))
 	code := builder.String()
-	noteId, err = jarExec.initNote("sh", info.GetInstanceId(), properties)
+	noteId, err = jarExec.initNote(ctx,"sh", info.GetInstanceId(), properties)
 	if err != nil {
 		return nil, err
 	}
