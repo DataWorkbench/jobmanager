@@ -331,28 +331,24 @@ func (bm *BaseExecutor) initNote(ctx context.Context, interceptor string, instan
 		fmt.Println("=====================================创建异常=================================================")
 		fmt.Println(err.Error())
 		var notesMap map[string]string
-		if err == qerror.ZeppelinNoteAlreadyExists {
-			fmt.Println("=====================================开始查看note=================================================")
-			notesMap, err = bm.zeppelinClient.ListNotes()
-			for k, v := range notesMap {
-				fmt.Println(k, v)
-			}
-			fmt.Println("=====================================查看note结束=================================================")
-			if err != nil {
-				fmt.Println("=====================================查看异常=================================================")
-				fmt.Println(err.Error())
-				return "", err
-			}
-			logger.Warn().Msg(fmt.Sprintf("note id exists list notes map is %s", notesMap)).Fire()
-			if len(notesMap["/"+instanceId]) > 0 {
-				logger.Warn().Msg(fmt.Sprintf("delete note name %s,id %s", "/"+instanceId, notesMap["/"+instanceId])).Fire()
-				_ = bm.zeppelinClient.DeleteNote(notesMap[instanceId])
-			}
-			noteId, err = bm.zeppelinClient.CreateNote(instanceId)
-			if err != nil {
-				return "", err
-			}
-		} else {
+		notesMap, err = bm.zeppelinClient.ListNotes()
+		if err != nil {
+			fmt.Println("=====================================查看异常=================================================")
+			fmt.Println(err.Error())
+			return "", err
+		}
+		fmt.Println("=====================================开始打印note信息=================================================")
+		for k, v := range notesMap {
+			fmt.Println(k, v)
+		}
+		fmt.Println("=====================================查看note结束=================================================")
+		logger.Warn().Msg(fmt.Sprintf("note id exists list notes map is %s", notesMap)).Fire()
+		if len(notesMap["/"+instanceId]) > 0 {
+			logger.Warn().Msg(fmt.Sprintf("delete note name %s,id %s", "/"+instanceId, notesMap["/"+instanceId])).Fire()
+			_ = bm.zeppelinClient.DeleteNote(notesMap[instanceId])
+		}
+		noteId, err = bm.zeppelinClient.CreateNote(instanceId)
+		if err != nil {
 			return "", err
 		}
 	}
