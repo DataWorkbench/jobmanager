@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/DataWorkbench/common/getcd"
 	"github.com/DataWorkbench/common/gormwrap"
 	"io/ioutil"
 	"os"
@@ -32,6 +33,7 @@ type Config struct {
 	GRPCServer            *grpcwrap.ServerConfig `json:"grpc_server"    yaml:"grpc_server"    env:"GRPC_SERVER"         validate:"required"`
 	MetricsServer         *metrics.Config        `json:"metrics_server" yaml:"metrics_server" env:"METRICS_SERVER"      validate:"required"`
 	MySQL                 *gormwrap.MySQLConfig  `json:"mysql"          yaml:"mysql"          env:"MYSQL"               validate:"required"`
+	ETCD                  *getcd.Config          `json:"etcd"           yaml:"etcd"           env:"ETCD"                validate:"required"`
 	Tracer                *gtrace.Config         `json:"tracer"         yaml:"tracer"         env:"TRACER"              validate:"required"`
 }
 

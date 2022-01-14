@@ -34,10 +34,9 @@ func init() {
 	client = jobpb.NewJobmanagerClient(conn)
 }
 
-func Test_RunSql(t *testing.T) {
+func Test_InitSql(t *testing.T) {
 	args := model.StreamJobArgs{
-		ClusterId:         "cfi-05636e792cfe5000",
-		Parallelism:       0,
+		ClusterId:         clusterId,
 		Udfs:              nil,
 		Connectors:        nil,
 		BuiltInConnectors: nil,
@@ -45,11 +44,12 @@ func Test_RunSql(t *testing.T) {
 	jobType := model.StreamJob_SQL
 
 	sql := flinkpb.FlinkSQL{Code: "" +
-		"create table if not exists datagen(id int,name string) with ('connector' = 'datagen','rows-per-second' = '2');" +
-		"create table if not exists print(id int,name string) with ('connector' = 'print');" +
-		"create table if not exists print2(id int) with ('connector' = 'print');" +
-		"insert into print select * from datagen;" +
-		"insert into print2 select id from datagen;"}
+		"create table if not exists datagen(id int,name string) with ('connector' = 'datagen','rows-per-second' = '2');\n" +
+		"create table if not exists print(id int,name string) with ('connector' = 'print');\n" +
+		"create table if not exists print2(id int) with ('connector' = 'print');\n" +
+		"-- insert into print select * from datagen;\n" +
+		"-- insert into print2 select id from datagen;\n" +
+		"select * from datagen;"}
 	code := model.StreamJobCode{
 		Type:      jobType,
 		Operators: nil,
@@ -58,118 +58,30 @@ func Test_RunSql(t *testing.T) {
 		Scala:     nil,
 		Python:    nil,
 	}
-	req := request.RunJob{
-		InstanceId:    "syx-JHGYFjhKwUfaQDHZ",
+	req := request.InitFlinkJob{
+		InstanceId:    instanceId,
 		SpaceId:       spaceId,
 		Args:          &args,
 		Code:          &code,
 		SavepointPath: "",
 	}
-	job, err := client.RunJob(ctx, &req)
+	job, err := client.InitFlinkJob(ctx, &req)
 	require.Nil(t, err)
 	fmt.Println(job)
 }
 
-func Test_RunScala(t *testing.T) {
-	args := model.StreamJobArgs{
-		ClusterId:         clusterId,
-		Parallelism:       1,
-		Udfs:              nil,
-		Connectors:        nil,
-		BuiltInConnectors: nil,
+func Test_InitJar(t *testing.T) {
+
+}
+
+func Test_Run(t *testing.T) {
+	req := request.SubmitFlinkJob{
+		InstanceId:  instanceId,
+		NoteId:      "2GUMB3ZMX",
+		ParagraphId: "paragraph_1642153522745_223731301",
+		Type:        model.StreamJob_SQL,
 	}
-	jobType := model.StreamJob_Scala
-	scala := flinkpb.FlinkScala{Code: "object HelloWorld {\ndef main(args: Array[String]): Unit = {\n    println(\"Hello, world!\")\n  }\n}"}
-	code := model.StreamJobCode{
-		Type:      jobType,
-		Operators: nil,
-		Sql:       nil,
-		Jar:       nil,
-		Scala:     &scala,
-		Python:    nil,
-	}
-	req := request.RunJob{
-		InstanceId:    instanceId2,
-		SpaceId:       spaceId,
-		Args:          &args,
-		Code:          &code,
-		SavepointPath: "",
-	}
-	job, err := client.RunJob(ctx, &req)
+	job, err := client.SubmitFlinkJob(ctx, &req)
 	require.Nil(t, err)
 	fmt.Println(job)
-}
-
-func Test_RunPython(t *testing.T) {
-	args := model.StreamJobArgs{
-		ClusterId:         clusterId,
-		Parallelism:       1,
-		Udfs:              nil,
-		Connectors:        nil,
-		BuiltInConnectors: nil,
-	}
-	jobType := model.StreamJob_Python
-	python := flinkpb.FlinkPython{Code: "object HelloWorld {\ndef main(args: Array[String]): Unit = {\n    println(\"Hello, world!\")\n  }\n}"}
-	code := model.StreamJobCode{
-		Type:      jobType,
-		Operators: nil,
-		Sql:       nil,
-		Jar:       nil,
-		Scala:     nil,
-		Python:    &python,
-	}
-	req := request.RunJob{
-		InstanceId:    instanceId2,
-		SpaceId:       spaceId,
-		Args:          &args,
-		Code:          &code,
-		SavepointPath: "",
-	}
-	job, err := client.RunJob(ctx, &req)
-	require.Nil(t, err)
-	fmt.Println(job)
-}
-
-func Test_Validate(t *testing.T) {
-	var code = "create table if not exists datagen(id int,name string);" +
-		"create table if not exists print(id int,name string);" +
-		"insert into print select * from datagen;"
-	code = "drop table if exists scores;\ncreate table scores(\n    id int,\n    name varchar(10),\n    scores varchar(10),\n    grow_up varchar(10)) WITH (\n'connector' = 'jdbc',\n'url' = 'jdbc:mysql:gpleqcxjmkwrf8osvzh432b7g56tad9u.mysql.qingcloud.link:3306/cltest',\n'table-name' = 'scores',\n'username' = 'chenliang',\n'password' = 'Cl123456#'\n);\nINSERT INTO scores VALUES (2,'chengxin','98','yes');\n\n\nxxdafdafdas"
-
-	sql := flinkpb.FlinkSQL{Code: code}
-	jobCode := model.StreamJobCode{
-		Type:      model.StreamJob_SQL,
-		Operators: nil,
-		Sql:       &sql,
-		Jar:       nil,
-		Scala:     nil,
-		Python:    nil,
-	}
-	req := request.ValidateJob{Code: &jobCode}
-	res, err := client.ValidateJob(ctx, &req)
-	require.Nil(t, err)
-	fmt.Println(res.Message)
-}
-
-func Test_GetInfo(t *testing.T) {
-	req := request.GetJobInfo{
-		InstanceId: instanceId,
-		SpaceId:    spaceId,
-		ClusterId:  clusterId,
-		Type:       model.StreamJob_SQL,
-	}
-	info, err := client.GetJobInfo(ctx, &req)
-	require.Nil(t, err)
-	fmt.Println(info)
-}
-
-func Test_Cancel(t *testing.T) {
-	req := request.CancelJob{
-		InstanceId: instanceId,
-		SpaceId:    spaceId,
-		ClusterId:  clusterId,
-		Type:       model.StreamJob_SQL,
-	}
-	_, err := client.CancelJob(ctx, &req)
-	require.Nil(t, err)
 }

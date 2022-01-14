@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/DataWorkbench/common/getcd"
 	"github.com/DataWorkbench/common/gormwrap"
 	"gorm.io/gorm"
 	"io"
@@ -49,6 +50,7 @@ func Start() (err error) {
 		engineClient   utils.EngineClient
 		resourceClient utils.ResourceClient
 		udfClient      utils.UdfClient
+		etcdClient     *getcd.Client
 	)
 
 	defer func() {
@@ -98,6 +100,10 @@ func Start() (err error) {
 		return
 	}
 
+	if etcdClient, err = getcd.NewClient(ctx, cfg.ETCD); err != nil {
+		return
+	}
+
 	rpcServer.Register(func(s *grpc.Server) {
 		zeppelinConfig := zeppelin.ClientConfig{
 			ZeppelinRestUrl: cfg.ZeppelinAddress,
@@ -110,8 +116,8 @@ func Start() (err error) {
 			RetryCount:    0,
 			QueryInterval: 0,
 		}
-		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(service.NewJobManagerService(ctx, db, udfClient, engineClient, resourceClient,
-			lp, zeppelinConfig, flinkConfig)))
+		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(service.NewJobManagerService(ctx, db, udfClient, engineClient,
+			resourceClient, zeppelinConfig, flinkConfig, etcdClient)))
 	})
 
 	sigGroup := []os.Signal{syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM}

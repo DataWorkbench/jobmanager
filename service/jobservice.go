@@ -3,65 +3,78 @@ package service
 import (
 	"context"
 	"github.com/DataWorkbench/common/flink"
+	"github.com/DataWorkbench/common/getcd"
 	"github.com/DataWorkbench/common/zeppelin"
-	"github.com/DataWorkbench/glog"
 	"github.com/DataWorkbench/gproto/pkg/model"
 	"github.com/DataWorkbench/gproto/pkg/request"
 	"github.com/DataWorkbench/gproto/pkg/response"
-	flinkService "github.com/DataWorkbench/jobmanager/service/flink"
 	"github.com/DataWorkbench/jobmanager/utils"
 	"gorm.io/gorm"
 )
 
 type JobManagerService struct {
-	ctx            context.Context
-	logger         *glog.Logger
-	flinkExecutors map[model.StreamJob_Type]flinkService.Executor
+	ctx           context.Context
+	flinkExecutor *FlinkExecutor
+	etcd          *getcd.Client
 }
 
 func NewJobManagerService(ctx context.Context, db *gorm.DB, uClient utils.UdfClient, eClient utils.EngineClient,
-	rClient utils.ResourceClient, logger *glog.Logger, zeppelinConfig zeppelin.ClientConfig,
-	flinkConfig flink.ClientConfig) *JobManagerService {
-	flinkBase := flinkService.NewBaseManager(ctx, db, logger, eClient, uClient, rClient, flinkConfig, zeppelinConfig)
+	rClient utils.ResourceClient, zeppelinConfig zeppelin.ClientConfig,
+	flinkConfig flink.ClientConfig, etcdClient *getcd.Client) *JobManagerService {
 	return &JobManagerService{
-		ctx:            ctx,
-		logger:         logger,
-		flinkExecutors: createFlinkExecutor(ctx, flinkBase),
+		ctx:           ctx,
+		flinkExecutor: NewFlinkExecutor(ctx, db, eClient, uClient, rClient, flinkConfig, zeppelinConfig),
+		etcd:          etcdClient,
 	}
 }
 
-func (jm *JobManagerService) RunFlinkJob(ctx context.Context, jobInfo *request.RunJob) (*response.RunJob, error) {
-	res := response.RunJob{}
-	executor := jm.flinkExecutors[jobInfo.Code.Type]
-
-	result, err := executor.Run(ctx, jobInfo)
+func (jm *JobManagerService) InitFlinkJob(ctx context.Context, req *request.InitFlinkJob) (*response.InitFlinkJob, error) {
+	res := response.InitFlinkJob{}
+	noteId, paragraphId, err := jm.flinkExecutor.initJob(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	data, state := flinkService.TransResult(result)
-	res.Message = data
-	res.State = state
+	res.NoteId = noteId
+	res.ParagraphId = paragraphId
 	return &res, nil
 }
 
-func (jm *JobManagerService) PreRunFlinkJob(ctx context.Context, jobInfo *request.RunJob) error {
-	return nil
+func (jm *JobManagerService) SubmitFlinkJob(ctx context.Context, req *request.SubmitFlinkJob) (*response.SubmitFlinkJob, error) {
+	mutex, err := getcd.NewMutex(ctx, jm.etcd, req.GetInstanceId())
+	if err != nil {
+		return nil, err
+	}
+	if err = mutex.TryLock(ctx); err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = mutex.Unlock(ctx)
+	}()
+	res := response.SubmitFlinkJob{}
+	result, err := jm.flinkExecutor.submitJob(ctx, req.GetInstanceId(), req.GetNoteId(), req.GetParagraphId(), req.GetType())
+	if err != nil {
+		return nil, err
+	}
+	data, state := jm.flinkExecutor.transResult(result)
+	res.Message = data
+	res.State = state
+	if result.JobId != "" && len(result.JobId) == 32 {
+		res.FlinkId = result.JobId
+	}
+	return &res, nil
 }
 
-func (jm *JobManagerService) ReleaseNote(ctx context.Context,jobType model.StreamJob_Type,instanceId string) error{
-	executor := jm.flinkExecutors[jobType]
-	return executor.Release(ctx,instanceId)
+func (jm *JobManagerService) FreeFlinkJob(ctx context.Context, instanceId string) error {
+	return jm.flinkExecutor.release(ctx, instanceId)
 }
 
-func (jm *JobManagerService) CancelFlinkJob(ctx context.Context, jobType model.StreamJob_Type, instanceId string, spaceId string, clusterId string) error {
-	executor := jm.flinkExecutors[jobType]
-	return executor.Cancel(ctx, instanceId, spaceId, clusterId)
+func (jm *JobManagerService) CancelFlinkJob(ctx context.Context, flinkId string, spaceId string, clusterId string) error {
+	return jm.flinkExecutor.cancelJob(ctx, flinkId, spaceId, clusterId)
 }
 
-func (jm *JobManagerService) GetFlinkJob(ctx context.Context, jobType model.StreamJob_Type, instanceId string, spaceId string, clusterId string) (*response.GetJobInfo, error) {
-	res := response.GetJobInfo{}
-	executor := jm.flinkExecutors[jobType]
-	job, err := executor.GetInfo(ctx, instanceId, spaceId, clusterId)
+func (jm *JobManagerService) GetFlinkJob(ctx context.Context, flinkId string, spaceId string, clusterId string) (*response.GetFlinkJob, error) {
+	res := response.GetFlinkJob{}
+	job, err := jm.flinkExecutor.getJobInfo(ctx, flinkId, spaceId, clusterId)
 	if err != nil {
 		return nil, err
 	}
@@ -78,10 +91,10 @@ func (jm *JobManagerService) GetFlinkJob(ctx context.Context, jobType model.Stre
 	return &res, nil
 }
 
-func (jm *JobManagerService) ValidateCode(jobCode *model.StreamJobCode) (*response.StreamJobCodeSyntax, error) {
+func (jm *JobManagerService) ValidateFlinkCode(ctx context.Context, jobCode *request.ValidateFlinkJob) (*response.StreamJobCodeSyntax, error) {
 	res := response.StreamJobCodeSyntax{}
-	executor := jm.flinkExecutors[jobCode.Type]
-	if flag, msg, err := executor.Validate(jobCode); err != nil {
+
+	if flag, msg, err := jm.flinkExecutor.validateCode(ctx, jobCode); err != nil {
 		return nil, err
 	} else {
 		if flag {
@@ -92,13 +105,4 @@ func (jm *JobManagerService) ValidateCode(jobCode *model.StreamJobCode) (*respon
 		}
 		return &res, nil
 	}
-}
-
-func createFlinkExecutor(ctx context.Context, bm *flinkService.BaseExecutor) map[model.StreamJob_Type]flinkService.Executor {
-	executors := map[model.StreamJob_Type]flinkService.Executor{}
-	executors[model.StreamJob_SQL] = flinkService.NewExecutor(ctx, model.StreamJob_SQL, bm)
-	executors[model.StreamJob_Jar] = flinkService.NewExecutor(ctx, model.StreamJob_Jar, bm)
-	executors[model.StreamJob_Scala] = flinkService.NewExecutor(ctx, model.StreamJob_Scala, bm)
-	executors[model.StreamJob_Python] = flinkService.NewExecutor(ctx, model.StreamJob_Python, bm)
-	return executors
 }
