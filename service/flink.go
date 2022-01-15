@@ -71,9 +71,9 @@ func (exec *FlinkExecutor) InitJob(ctx context.Context, req *request.InitFlinkJo
 	defer func() {
 		if err != nil {
 			logger.Error().Msg(err.Error()).Fire()
-			if noteId != "" && len(noteId) > 0 {
-				_ = exec.zeppelinClient.DeleteNote(noteId)
-			}
+			//if noteId != "" && len(noteId) > 0 {
+			//	_ = exec.zeppelinClient.DeleteNote(noteId)
+			//}
 		} else {
 			if result != nil && !result.Status.IsFinished() {
 				var data string
