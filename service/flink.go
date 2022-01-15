@@ -621,27 +621,27 @@ func (exec *FlinkExecutor) getFlinkMessage(ctx context.Context, spaceId string, 
 
 func (exec *FlinkExecutor) getGlobalProperties(ctx context.Context, info *request.InitFlinkJob, udfs []*Udf) (map[string]string, error) {
 	properties := map[string]string{}
-	//flinkUrl, flinkVersion, err := exec.getFlinkMessage(ctx, info.SpaceId, info.GetArgs().GetClusterId())
-	//if err != nil {
-	//	return nil, err
-	//}
-	//properties["FLINK_HOME"] = constants.FlinkClientHome[flinkVersion]
-	//host := flinkUrl[:strings.Index(flinkUrl, ":")]
-	//port := flinkUrl[strings.Index(flinkUrl, ":")+1:]
-	//if host != "" && len(host) > 0 && port != "" && len(port) > 0 {
-	//	properties["flink.execution.remote.host"] = host
-	//	properties["flink.execution.remote.port"] = port
-	//} else {
-	//	return nil, qerror.ParseEngineFlinkUrlFailed.Format(flinkUrl)
-	//}
+	flinkUrl, flinkVersion, err := exec.getFlinkMessage(ctx, info.SpaceId, info.GetArgs().GetClusterId())
+	if err != nil {
+		return nil, err
+	}
+	properties["FLINK_HOME"] = constants.FlinkClientHome[flinkVersion]
+	host := flinkUrl[:strings.Index(flinkUrl, ":")]
+	port := flinkUrl[strings.Index(flinkUrl, ":")+1:]
+	if host != "" && len(host) > 0 && port != "" && len(port) > 0 {
+		properties["flink.execution.remote.host"] = host
+		properties["flink.execution.remote.port"] = port
+	} else {
+		return nil, qerror.ParseEngineFlinkUrlFailed.Format(flinkUrl)
+	}
 	properties["flink.execution.mode"] = "remote"
 	properties["zeppelin.flink.concurrentBatchSql.max"] = "100000"
 	properties["zeppelin.flink.concurrentStreamSql.max"] = "100000"
 
-	properties["FLINK_HOME"] = "/Users/apple/develop/bigdata/flink-1.12.5"
-	properties["flink.execution.remote.host"] = "127.0.0.1"
-	properties["flink.execution.remote.port"] = "8081"
-	flinkVersion := "flink-1.12.3-scala_2.11"
+	//properties["FLINK_HOME"] = "/Users/apple/develop/bigdata/flink-1.12.5"
+	//properties["flink.execution.remote.host"] = "127.0.0.1"
+	//properties["flink.execution.remote.port"] = "8081"
+	//flinkVersion := "flink-1.12.3-scala_2.11"
 
 	var executionJars string
 	baseConnectors := exec.getBaseConnectors(info.GetArgs().GetBuiltInConnectors(), flinkVersion)
