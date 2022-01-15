@@ -131,7 +131,9 @@ func (exec *FlinkExecutor) SubmitJob(ctx context.Context, instanceId string, not
 
 func (exec *FlinkExecutor) GetJobInfo(ctx context.Context, flinkId string, spaceId string, clusterId string) (*flink.Job, error) {
 	//flinkUrl := "127.0.0.1:8081"
+	logger := glog.FromContext(ctx)
 	flinkUrl, _, err := exec.engineClient.GetEngineInfo(ctx, spaceId, clusterId)
+	logger.Info().Msg(fmt.Sprintf("flink url is %s", flinkUrl)).Fire()
 	if err != nil {
 		return nil, err
 	}
@@ -144,13 +146,7 @@ func (exec *FlinkExecutor) Release(ctx context.Context, instanceId string, noteI
 	if err = exec.zeppelinClient.DeleteNote(noteId); err != nil {
 		logger.Warn().Msg(fmt.Sprintf("delete note failed,noteid is %s,reason is %s", noteId, err.Error()))
 	}
-	if err = exec.deleteResult(ctx, instanceId); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.Warn().Msg(fmt.Sprintf("delete note db data failed,instanceid is %s,reason is %s", instanceId, err.Error()))
-			return nil
-		}
-	}
-	return err
+	return exec.deleteResult(ctx, instanceId)
 }
 
 func (exec *FlinkExecutor) CancelJob(ctx context.Context, flinkId string, spaceId string, clusterId string) (err error) {

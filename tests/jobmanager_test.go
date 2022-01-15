@@ -34,6 +34,11 @@ func init() {
 	client = jobpb.NewJobmanagerClient(conn)
 }
 
+func Test_JobID(t *testing.T){
+	var flinkId = "f7083d6497d90bb8e408c9419d8d858e"
+	fmt.Println(len(flinkId))
+}
+
 func Test_InitSql(t *testing.T) {
 	args := model.StreamJobArgs{
 		ClusterId:         clusterId,
