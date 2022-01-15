@@ -278,12 +278,19 @@ func (exec *FlinkExecutor) initJar(ctx context.Context, req *request.InitFlinkJo
 	}
 	runBuilder.WriteString(fmt.Sprintf(" %s %s", localJarPath, req.GetCode().GetJar().GetJarArgs()))
 	initCode := initBuilder.String()
-	logger.Info().Msg(fmt.Sprintf("the jar job init code is %s", initCode))
+	logger.Info().Msg(fmt.Sprintf("the jar job init code is %s", initCode)).Fire()
 	runCode := runBuilder.String()
-	logger.Info().Msg(fmt.Sprintf("the jar job run code is %s", runCode))
+	logger.Info().Msg(fmt.Sprintf("the jar job run code is %s", runCode)).Fire()
 	result, err := exec.zeppelinClient.Submit("sh", "", noteId, initCode)
 	if err != nil {
 		return "", "", nil, err
+	} else if result != nil && !result.Status.IsFinished() {
+		for _, re := range result.Results {
+			if strings.EqualFold(re.Type, "TEXT") {
+				logger.Warn().Msg(fmt.Sprintf("init jar failed,reason is %s", re.Data))
+			}
+		}
+		return "", "", nil, qerror.ZeppelinInitFailed
 	}
 	paragraphId, err := exec.zeppelinClient.AddParagraph(noteId, "code", runCode)
 	if err != nil {
