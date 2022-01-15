@@ -3,8 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/DataWorkbench/common/getcd"
-	"github.com/DataWorkbench/common/gormwrap"
 	"gorm.io/gorm"
 	"io"
 	"os"
@@ -13,6 +11,8 @@ import (
 	"time"
 
 	"github.com/DataWorkbench/common/flink"
+	"github.com/DataWorkbench/common/getcd"
+	"github.com/DataWorkbench/common/gormwrap"
 	"github.com/DataWorkbench/common/grpcwrap"
 	"github.com/DataWorkbench/common/gtrace"
 	"github.com/DataWorkbench/common/metrics"
@@ -23,6 +23,7 @@ import (
 	"github.com/DataWorkbench/jobmanager/config"
 	"github.com/DataWorkbench/jobmanager/service"
 	"github.com/DataWorkbench/jobmanager/utils"
+
 	"google.golang.org/grpc"
 )
 

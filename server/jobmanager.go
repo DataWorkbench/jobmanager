@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+
 	"github.com/DataWorkbench/gproto/pkg/jobpb"
 	"github.com/DataWorkbench/gproto/pkg/model"
 	"github.com/DataWorkbench/gproto/pkg/request"
@@ -19,7 +20,7 @@ func NewJobManagerServer(service *service.JobManagerService) *JobManagerServer {
 }
 
 func (s *JobManagerServer) FreeFlinkJob(ctx context.Context, req *request.FreeFlinkJob) (*model.EmptyStruct, error) {
-	return &model.EmptyStruct{}, s.service.FreeFlinkJob(ctx, req.GetInstanceId())
+	return &model.EmptyStruct{}, s.service.FreeFlinkJob(ctx, req.GetInstanceId(), req.GetNoteId())
 }
 func (s *JobManagerServer) InitFlinkJob(ctx context.Context, req *request.InitFlinkJob) (*response.InitFlinkJob, error) {
 	return s.service.InitFlinkJob(ctx, req)

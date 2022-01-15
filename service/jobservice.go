@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+
 	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/getcd"
 	"github.com/DataWorkbench/common/zeppelin"
@@ -9,6 +10,7 @@ import (
 	"github.com/DataWorkbench/gproto/pkg/request"
 	"github.com/DataWorkbench/gproto/pkg/response"
 	"github.com/DataWorkbench/jobmanager/utils"
+
 	"gorm.io/gorm"
 )
 
@@ -30,7 +32,7 @@ func NewJobManagerService(ctx context.Context, db *gorm.DB, uClient utils.UdfCli
 
 func (jm *JobManagerService) InitFlinkJob(ctx context.Context, req *request.InitFlinkJob) (*response.InitFlinkJob, error) {
 	res := response.InitFlinkJob{}
-	noteId, paragraphId, err := jm.flinkExecutor.initJob(ctx, req)
+	noteId, paragraphId, err := jm.flinkExecutor.InitJob(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +53,7 @@ func (jm *JobManagerService) SubmitFlinkJob(ctx context.Context, req *request.Su
 		_ = mutex.Unlock(ctx)
 	}()
 	res := response.SubmitFlinkJob{}
-	result, err := jm.flinkExecutor.submitJob(ctx, req.GetInstanceId(), req.GetNoteId(), req.GetParagraphId(), req.GetType())
+	result, err := jm.flinkExecutor.SubmitJob(ctx, req.GetInstanceId(), req.GetNoteId(), req.GetParagraphId(), req.GetType())
 	if err != nil {
 		return nil, err
 	}
@@ -64,17 +66,17 @@ func (jm *JobManagerService) SubmitFlinkJob(ctx context.Context, req *request.Su
 	return &res, nil
 }
 
-func (jm *JobManagerService) FreeFlinkJob(ctx context.Context, instanceId string) error {
-	return jm.flinkExecutor.release(ctx, instanceId)
+func (jm *JobManagerService) FreeFlinkJob(ctx context.Context, instanceId string, noteId string) error {
+	return jm.flinkExecutor.Release(ctx, instanceId, noteId)
 }
 
 func (jm *JobManagerService) CancelFlinkJob(ctx context.Context, flinkId string, spaceId string, clusterId string) error {
-	return jm.flinkExecutor.cancelJob(ctx, flinkId, spaceId, clusterId)
+	return jm.flinkExecutor.CancelJob(ctx, flinkId, spaceId, clusterId)
 }
 
 func (jm *JobManagerService) GetFlinkJob(ctx context.Context, flinkId string, spaceId string, clusterId string) (*response.GetFlinkJob, error) {
 	res := response.GetFlinkJob{}
-	job, err := jm.flinkExecutor.getJobInfo(ctx, flinkId, spaceId, clusterId)
+	job, err := jm.flinkExecutor.GetJobInfo(ctx, flinkId, spaceId, clusterId)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +96,7 @@ func (jm *JobManagerService) GetFlinkJob(ctx context.Context, flinkId string, sp
 func (jm *JobManagerService) ValidateFlinkCode(ctx context.Context, jobCode *request.ValidateFlinkJob) (*response.StreamJobCodeSyntax, error) {
 	res := response.StreamJobCodeSyntax{}
 
-	if flag, msg, err := jm.flinkExecutor.validateCode(ctx, jobCode); err != nil {
+	if flag, msg, err := jm.flinkExecutor.ValidateCode(ctx, jobCode); err != nil {
 		return nil, err
 	} else {
 		if flag {
