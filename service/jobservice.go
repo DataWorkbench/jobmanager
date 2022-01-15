@@ -42,16 +42,16 @@ func (jm *JobManagerService) InitFlinkJob(ctx context.Context, req *request.Init
 }
 
 func (jm *JobManagerService) SubmitFlinkJob(ctx context.Context, req *request.SubmitFlinkJob) (*response.SubmitFlinkJob, error) {
-	mutex, err := getcd.NewMutex(ctx, jm.etcd, req.GetInstanceId())
-	if err != nil {
-		return nil, err
-	}
-	if err = mutex.TryLock(ctx); err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = mutex.Unlock(ctx)
-	}()
+	//mutex, err := getcd.NewMutex(ctx, jm.etcd, req.GetInstanceId())
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if err = mutex.TryLock(ctx); err != nil {
+	//	return nil, err
+	//}
+	//defer func() {
+	//	_ = mutex.Unlock(ctx)
+	//}()
 	res := response.SubmitFlinkJob{}
 	result, err := jm.flinkExecutor.SubmitJob(ctx, req.GetInstanceId(), req.GetNoteId(), req.GetParagraphId(), req.GetType())
 	if err != nil {

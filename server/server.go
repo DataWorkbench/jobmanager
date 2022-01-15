@@ -101,9 +101,9 @@ func Start() (err error) {
 		return
 	}
 
-	if etcdClient, err = getcd.NewClient(ctx, cfg.ETCD); err != nil {
-		return
-	}
+	//if etcdClient, err = getcd.NewClient(ctx, cfg.ETCD); err != nil {
+	//	return
+	//}
 
 	rpcServer.Register(func(s *grpc.Server) {
 		zeppelinConfig := zeppelin.ClientConfig{
