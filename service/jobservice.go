@@ -21,11 +21,11 @@ type JobManagerService struct {
 }
 
 func NewJobManagerService(ctx context.Context, db *gorm.DB, uClient utils.UdfClient, eClient utils.EngineClient,
-	rClient utils.ResourceClient, zeppelinConfig zeppelin.ClientConfig,
-	flinkConfig flink.ClientConfig, etcdClient *getcd.Client) *JobManagerService {
+	rClient utils.ResourceClient, fClient *flink.Client,
+	zClient *zeppelin.Client, etcdClient *getcd.Client) *JobManagerService {
 	return &JobManagerService{
 		ctx:           ctx,
-		flinkExecutor: NewFlinkExecutor(ctx, db, eClient, uClient, rClient, flinkConfig, zeppelinConfig),
+		flinkExecutor: NewFlinkExecutor(ctx, db, eClient, uClient, rClient, fClient, zClient),
 		etcd:          etcdClient,
 	}
 }
@@ -89,6 +89,9 @@ func (jm *JobManagerService) GetFlinkJob(ctx context.Context, flinkId string, sp
 		res.State = model.StreamJobInst_Succeed
 	case "RUNNING":
 		res.State = model.StreamJobInst_Running
+	}
+	if job.Exceptions != nil {
+		res.Message = job.Exceptions.RootException
 	}
 	return &res, nil
 }

@@ -14,11 +14,11 @@ dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/DataDog/datadog-go v3.7.1+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
-github.com/DataWorkbench/common v0.0.0-20220114084517-a82f06536992 h1:aa50Xui6rFUCugHuWBovC+RwFqKgAuEydWg2T98b76E=
-github.com/DataWorkbench/common v0.0.0-20220114084517-a82f06536992/go.mod h1:LkPcP3Eif0SMQUD+ykVLJG5pGDeKbeneCB7KSOsDQ30=
+github.com/DataWorkbench/common v0.0.0-20220116142737-16dd5cf69074 h1:59XiklHSwEu7E2Kkq+cTULuL4Cd2S9RZM8+TLp0n80A=
+github.com/DataWorkbench/common v0.0.0-20220116142737-16dd5cf69074/go.mod h1:+TWiJlAd/Iw99WyKBXBNzW/s1svikfqWe8f4k6nvcAk=
 github.com/DataWorkbench/glog v0.0.0-20210809050640-4960fd6de6ab h1:qQ6Nd6amyEXvslSxP+62TITT2fbPHKjt0rbyjzzfoP8=
 github.com/DataWorkbench/glog v0.0.0-20210809050640-4960fd6de6ab/go.mod h1:zymxJLXn162xdWYUqIb729S3ZzRQpdTj/LwnW+xxru4=
-github.com/DataWorkbench/gproto v0.0.0-20211104011919-3ac6e567ea90/go.mod h1:bdju+jQfnsfc2IGHllEcCR9Nm57FjIqu8I2IANyY49Q=
+github.com/DataWorkbench/gproto v0.0.0-20220115110054-785270d2b35e/go.mod h1:TPG4XHdL5umHdj5MB+ZqbwkMswgJVJkjpy2UG1TuHZk=
 github.com/DataWorkbench/gproto v0.0.0-20220115132801-e0b2aafe0113 h1:FSOj7B8yefg5kN4yYtxoummyiU/tzuRSi5iiGe+1vv4=
 github.com/DataWorkbench/gproto v0.0.0-20220115132801-e0b2aafe0113/go.mod h1:TPG4XHdL5umHdj5MB+ZqbwkMswgJVJkjpy2UG1TuHZk=
 github.com/DataWorkbench/loader v0.0.0-20201119073611-6f210eb11a8c h1:HcEtluqqKKkBW4wK8YvnCIPxtffbEYBrVr3x/T98vWU=
@@ -122,9 +122,7 @@ github.com/gogo/protobuf v1.2.1/go.mod h1:hp+jE20tsWTFYpLwKvXlhS1hjn+gTNwPg2I6zV
 github.com/gogo/protobuf v1.3.0/go.mod h1:SlYgWuQ5SjCEi6WLHjHCa1yvBfUnHcTbrrZtXPKa29o=
 github.com/gogo/protobuf v1.3.2 h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=
 github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
-github.com/gojek/heimdall/v7 v7.0.2 h1:+YutGXZ8oEWbCJIwjRnkKmoTl+Oxt1Urs3hc/FR0sxU=
 github.com/gojek/heimdall/v7 v7.0.2/go.mod h1:Z43HtMid7ysSjmsedPTXAki6jcdcNVnjn5pmsTyiMic=
-github.com/gojek/valkyrie v0.0.0-20180215180059-6aee720afcdf h1:5xRGbUdOmZKoDXkGx5evVLehuCMpuO1hl701bEQqXOM=
 github.com/gojek/valkyrie v0.0.0-20180215180059-6aee720afcdf/go.mod h1:QzhUKaYKJmcbTnCYCAVQrroCOY7vOOI8cSQ4NbuhYf0=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
 github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
@@ -368,7 +366,6 @@ github.com/yu31/dqueue v0.0.0-20220109113339-2dc95440c13c/go.mod h1:VvTk7r7w2dUN
 github.com/yu31/gcron v0.0.0-20220109164512-f4b84f672fef h1:T0gr9qfea07R2S9E3EVzWsJRuZHYjXCcGmtWTRjITfU=
 github.com/yu31/gcron v0.0.0-20220109164512-f4b84f672fef/go.mod h1:jW6Lqn5d71rdpbAC198RuOCjuSMq9XeGLmueQe6HIXY=
 github.com/yu31/gostructs v0.0.0-20220107115217-dc0130426169/go.mod h1:2nxYgIcGxEN5nRc3n3pRusl7ys+oEM14uInKe+WtouQ=
-github.com/yu31/proto-go-plugin v0.0.0-20210814181844-8ab7c30e3621/go.mod h1:h6xo0eO7YxyOUxzcD0giuvy3LoDb8FKEvvQfPzvfhpI=
 github.com/yu31/proto-go-plugin v0.0.0-20220115103705-d5bea0009af8 h1:yY6kH9GuZZ10U/Akx6k+V9JdKTQdYu+Rg+ssKDDYzk0=
 github.com/yu31/proto-go-plugin v0.0.0-20220115103705-d5bea0009af8/go.mod h1:pTuBlKkihzb4/kUqfwJXnPp1Ygwd2rnEDB9uW6S7WKU=
 github.com/yu31/snowflake v0.0.0-20210309213122-580647caa2bb/go.mod h1:kj86CfGUK7fPMCyw7lN1CgNDJ57GmtZgyzPqftMd0kQ=

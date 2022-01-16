@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -47,15 +48,15 @@ type Udf struct {
 }
 
 func NewFlinkExecutor(ctx context.Context, db *gorm.DB, engineClient utils.EngineClient, udfClient utils.UdfClient, resourceClient utils.ResourceClient,
-	flinkConfig flink.ClientConfig, zeppelinConfig zeppelin.ClientConfig) *FlinkExecutor {
+	flinkClient *flink.Client, zeppelinClient *zeppelin.Client) *FlinkExecutor {
 	return &FlinkExecutor{
 		ctx:            ctx,
 		db:             db,
 		engineClient:   engineClient,
 		udfClient:      udfClient,
 		resourceClient: resourceClient,
-		flinkClient:    flink.NewFlinkClient(flinkConfig),
-		zeppelinClient: zeppelin.NewZeppelinClient(zeppelinConfig),
+		flinkClient:    flinkClient,
+		zeppelinClient: zeppelinClient,
 	}
 }
 
@@ -133,32 +134,55 @@ func (exec *FlinkExecutor) SubmitJob(ctx context.Context, instanceId string, not
 }
 
 func (exec *FlinkExecutor) GetJobInfo(ctx context.Context, flinkId string, spaceId string, clusterId string) (*flink.Job, error) {
-	//flinkUrl := "127.0.0.1:8081"
-	logger := glog.FromContext(ctx)
-	flinkUrl, _, err := exec.engineClient.GetEngineInfo(ctx, spaceId, clusterId)
-	logger.Info().Msg(fmt.Sprintf("flink url is %s", flinkUrl)).Fire()
+	var (
+		flinkUrl   string
+		err        error
+		logger     = glog.FromContext(ctx)
+		exceptions *flink.JobExceptions
+	)
+	if strings.EqualFold(os.Getenv("LOCAL"), "TRUE") {
+		flinkUrl = "127.0.0.1:8081"
+	} else {
+		if flinkUrl, _, err = exec.engineClient.GetEngineInfo(ctx, spaceId, clusterId); err != nil {
+			logger.Info().Msg(fmt.Sprintf("flink url is %s", flinkUrl)).Fire()
+			return nil, err
+		}
+	}
+	job, err := exec.flinkClient.GetInfo(ctx, flinkUrl, flinkId)
 	if err != nil {
 		return nil, err
 	}
-	return exec.flinkClient.GetJobInfoByJobId(flinkUrl, flinkId)
+	if strings.EqualFold(job.State, "FAILED") {
+		if exceptions, err = exec.flinkClient.GetExceptions(ctx, flinkUrl, flinkId); err != nil {
+			return nil, err
+		}
+		job.Exceptions = exceptions
+	}
+	return job, nil
 }
 
 func (exec *FlinkExecutor) Release(ctx context.Context, instanceId string, noteId string) error {
 	var err error
 	logger := glog.FromContext(ctx)
-	if err = exec.zeppelinClient.DeleteNote(noteId); err != nil {
+	if err = exec.zeppelinClient.DeleteNote(ctx, noteId); err != nil {
 		logger.Warn().Msg(fmt.Sprintf("delete note failed,noteid is %s,reason is %s", noteId, err.Error())).Fire()
 	}
 	return exec.deleteResult(ctx, instanceId)
 }
 
-func (exec *FlinkExecutor) CancelJob(ctx context.Context, flinkId string, spaceId string, clusterId string) (err error) {
-	//flinkUrl := "127.0.0.1:8081"
-	flinkUrl, _, err := exec.getFlinkMessage(ctx, spaceId, clusterId)
-	if err != nil {
-		return err
+func (exec *FlinkExecutor) CancelJob(ctx context.Context, flinkId string, spaceId string, clusterId string) error {
+	var (
+		flinkUrl string
+		err      error
+	)
+	if strings.EqualFold(os.Getenv("LOCAL"), "TRUE") {
+		flinkUrl = "127.0.0.1:8081"
+	} else {
+		if flinkUrl, _, err = exec.getFlinkMessage(ctx, spaceId, clusterId); err != nil {
+			return err
+		}
 	}
-	return exec.flinkClient.CancelJob(flinkUrl, flinkId)
+	return exec.flinkClient.CancelJob(ctx, flinkUrl, flinkId)
 }
 
 func (exec *FlinkExecutor) ValidateCode(ctx context.Context, jobCode *request.ValidateFlinkJob) (bool, string, error) {
@@ -173,16 +197,16 @@ func (exec *FlinkExecutor) ValidateCode(ctx context.Context, jobCode *request.Va
 			return false, "", err
 		}
 		noteName := random.String()
-		noteId, err := exec.zeppelinClient.CreateNote(noteName)
+		noteId, err := exec.zeppelinClient.CreateNote(ctx, noteName)
 		defer func() {
 			if len(noteId) > 0 {
-				_ = exec.zeppelinClient.DeleteNote(noteId)
+				_ = exec.zeppelinClient.DeleteNote(ctx, noteId)
 			}
 		}()
 		if err != nil {
 			return false, "", err
 		}
-		if result, err := exec.zeppelinClient.Execute("sh", "", noteId, builder.String()); err != nil {
+		if result, err := exec.zeppelinClient.Execute(ctx, "sh", "", noteId, builder.String()); err != nil {
 			return false, "", err
 		} else if result.Results != nil && len(result.Results) > 0 {
 			if strings.Contains(result.Results[0].Data, "Non-query expression") {
@@ -237,7 +261,7 @@ func (exec *FlinkExecutor) initSql(ctx context.Context, req *request.InitFlinkJo
 	}
 	builder.WriteString(" " + req.GetCode().GetSql().GetCode())
 	logger.Info().Msg(fmt.Sprintf("the execute message is %s", builder.String()))
-	paragraphId, err := exec.zeppelinClient.AddParagraph(noteId, "code", builder.String())
+	paragraphId, err := exec.zeppelinClient.AddParagraph(ctx, noteId, "code", builder.String())
 	if err != nil {
 		return "", "", nil, err
 	}
@@ -287,7 +311,7 @@ func (exec *FlinkExecutor) initJar(ctx context.Context, req *request.InitFlinkJo
 	logger.Info().Msg(fmt.Sprintf("the jar job init code is %s", initCode)).Fire()
 	runCode := runBuilder.String()
 	logger.Info().Msg(fmt.Sprintf("the jar job run code is %s", runCode)).Fire()
-	result, err := exec.zeppelinClient.Execute("sh", "", noteId, initCode)
+	result, err := exec.zeppelinClient.Execute(ctx, "sh", "", noteId, initCode)
 	if err != nil {
 		return "", "", nil, err
 	} else if result != nil && !result.Status.IsFinished() {
@@ -298,7 +322,7 @@ func (exec *FlinkExecutor) initJar(ctx context.Context, req *request.InitFlinkJo
 		}
 		return "", "", nil, qerror.ZeppelinInitFailed
 	}
-	paragraphId, err := exec.zeppelinClient.AddParagraph(noteId, "code", runCode)
+	paragraphId, err := exec.zeppelinClient.AddParagraph(ctx, noteId, "code", runCode)
 	if err != nil {
 		return "", "", nil, err
 	}
@@ -306,7 +330,7 @@ func (exec *FlinkExecutor) initJar(ctx context.Context, req *request.InitFlinkJo
 }
 
 func (exec *FlinkExecutor) runSql(ctx context.Context, instanceId string, noteId string, paragraphId string, logger *glog.Logger) (*zeppelin.ParagraphResult, error) {
-	result, err := exec.zeppelinClient.SubmitParagraph(noteId, paragraphId)
+	result, err := exec.zeppelinClient.SubmitParagraph(ctx, noteId, paragraphId)
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +361,7 @@ func (exec *FlinkExecutor) runSql(ctx context.Context, instanceId string, noteId
 		}
 	}()
 	for {
-		if result, err = exec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
+		if result, err = exec.zeppelinClient.QueryParagraphResult(ctx, noteId, result.ParagraphId); err != nil {
 			return nil, err
 		}
 		logger.Info().Msg(fmt.Sprintf("query result for instance %s until submit success, status %s, result %v", instanceId, result.Status, result.Results)).Fire()
@@ -357,7 +381,7 @@ func (exec *FlinkExecutor) runSql(ctx context.Context, instanceId string, noteId
 }
 
 func (exec *FlinkExecutor) runJar(ctx context.Context, instanceId string, noteId string, paragraphId string, logger *glog.Logger) (*zeppelin.ParagraphResult, error) {
-	result, err := exec.zeppelinClient.SubmitParagraph(noteId, paragraphId)
+	result, err := exec.zeppelinClient.SubmitParagraph(ctx, noteId, paragraphId)
 	if err != nil {
 		return nil, err
 	}
@@ -385,7 +409,7 @@ func (exec *FlinkExecutor) runJar(ctx context.Context, instanceId string, noteId
 		}
 	}()
 	for {
-		if result, err = exec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
+		if result, err = exec.zeppelinClient.QueryParagraphResult(ctx, noteId, result.ParagraphId); err != nil {
 			return nil, err
 		}
 		logger.Info().Msg(fmt.Sprintf("query result for instance %s , status %s, result %v", instanceId, result.Status, result.Results))
@@ -587,12 +611,12 @@ func (exec *FlinkExecutor) registerUDF(ctx context.Context, noteId string, udfs 
 	for _, udf := range udfs {
 		switch udf.udfType {
 		case model.UDFInfo_Scala:
-			if result, err = exec.zeppelinClient.Submit("flink", "", noteId, udf.code); err != nil {
+			if result, err = exec.zeppelinClient.Submit(ctx, "flink", "", noteId, udf.code); err != nil {
 				return nil, err
 			}
 			start := time.Now().Unix()
 			for (start - time.Now().Unix()) < 5000 {
-				if result, err = exec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
+				if result, err = exec.zeppelinClient.QueryParagraphResult(ctx, noteId, result.ParagraphId); err != nil {
 					return nil, err
 				}
 				if !result.Status.IsRunning() && !result.Status.IsPending() {
@@ -600,12 +624,12 @@ func (exec *FlinkExecutor) registerUDF(ctx context.Context, noteId string, udfs 
 				}
 			}
 		case model.UDFInfo_Python:
-			if result, err = exec.zeppelinClient.Submit("flink", "ipyflink", noteId, udf.code); err != nil {
+			if result, err = exec.zeppelinClient.Submit(ctx, "flink", "ipyflink", noteId, udf.code); err != nil {
 				return nil, err
 			}
 			start := time.Now().Unix()
 			for (start - time.Now().Unix()) < 5000 {
-				if result, err = exec.zeppelinClient.QueryParagraphResult(noteId, result.ParagraphId); err != nil {
+				if result, err = exec.zeppelinClient.QueryParagraphResult(ctx, noteId, result.ParagraphId); err != nil {
 					return nil, err
 				}
 				if !result.Status.IsRunning() && !result.Status.IsPending() {
@@ -629,28 +653,34 @@ func (exec *FlinkExecutor) getFlinkMessage(ctx context.Context, spaceId string, 
 }
 
 func (exec *FlinkExecutor) getGlobalProperties(ctx context.Context, info *request.InitFlinkJob, udfs []*Udf) (map[string]string, error) {
-	properties := map[string]string{}
-	flinkUrl, flinkVersion, err := exec.getFlinkMessage(ctx, info.SpaceId, info.GetArgs().GetClusterId())
-	if err != nil {
-		return nil, err
-	}
-	properties["FLINK_HOME"] = constants.FlinkClientHome[flinkVersion]
-	host := flinkUrl[:strings.Index(flinkUrl, ":")]
-	port := flinkUrl[strings.Index(flinkUrl, ":")+1:]
-	if host != "" && len(host) > 0 && port != "" && len(port) > 0 {
-		properties["flink.execution.remote.host"] = host
-		properties["flink.execution.remote.port"] = port
+	var (
+		properties   = map[string]string{}
+		flinkUrl     string
+		flinkVersion string
+		err          error
+	)
+	if strings.EqualFold(os.Getenv("LOCAL"), "TRUE") {
+		properties["FLINK_HOME"] = "/Users/apple/develop/bigdata/flink-1.12.5"
+		properties["flink.execution.remote.host"] = "127.0.0.1"
+		properties["flink.execution.remote.port"] = "8081"
+		flinkVersion = "flink-1.12.3-scala_2.11"
 	} else {
-		return nil, qerror.ParseEngineFlinkUrlFailed.Format(flinkUrl)
+		if flinkUrl, flinkVersion, err = exec.getFlinkMessage(ctx, info.SpaceId, info.GetArgs().GetClusterId()); err != nil {
+			return nil, err
+		}
+		properties["FLINK_HOME"] = constants.FlinkClientHome[flinkVersion]
+		host := flinkUrl[:strings.Index(flinkUrl, ":")]
+		port := flinkUrl[strings.Index(flinkUrl, ":")+1:]
+		if host != "" && len(host) > 0 && port != "" && len(port) > 0 {
+			properties["flink.execution.remote.host"] = host
+			properties["flink.execution.remote.port"] = port
+		} else {
+			return nil, qerror.ParseEngineFlinkUrlFailed.Format(flinkUrl)
+		}
 	}
 	properties["flink.execution.mode"] = "remote"
 	properties["zeppelin.flink.concurrentBatchSql.max"] = "100000"
 	properties["zeppelin.flink.concurrentStreamSql.max"] = "100000"
-
-	//properties["FLINK_HOME"] = "/Users/apple/develop/bigdata/flink-1.12.5"
-	//properties["flink.execution.remote.host"] = "127.0.0.1"
-	//properties["flink.execution.remote.port"] = "8081"
-	//flinkVersion := "flink-1.12.3-scala_2.11"
 
 	var executionJars string
 	baseConnectors := exec.getBaseConnectors(info.GetArgs().GetBuiltInConnectors(), flinkVersion)
@@ -678,13 +708,13 @@ func (exec *FlinkExecutor) initNote(ctx context.Context, interceptor string, ins
 	var err error
 	defer func() {
 		if len(noteId) > 0 && (result == nil || result.Status != zeppelin.FINISHED) {
-			_ = exec.zeppelinClient.DeleteNote(noteId)
+			_ = exec.zeppelinClient.DeleteNote(ctx, noteId)
 			err = qerror.ZeppelinInitFailed
 		}
 	}()
-	if noteId, err = exec.zeppelinClient.CreateNote(instanceId); err != nil {
+	if noteId, err = exec.zeppelinClient.CreateNote(ctx, instanceId); err != nil {
 		var notesMap map[string]string
-		notesMap, err = exec.zeppelinClient.ListNotes()
+		notesMap, err = exec.zeppelinClient.ListNotes(ctx)
 		if err != nil {
 			fmt.Println(err.Error())
 			return "", err
@@ -692,11 +722,11 @@ func (exec *FlinkExecutor) initNote(ctx context.Context, interceptor string, ins
 		logger.Warn().Msg(fmt.Sprintf("note id exists, notes map is %s", notesMap)).Fire()
 		if len(notesMap["/"+instanceId]) > 0 {
 			logger.Warn().Msg(fmt.Sprintf("delete notename is %s,noteid is %s", "/"+instanceId, notesMap["/"+instanceId])).Fire()
-			if err = exec.zeppelinClient.DeleteNote(notesMap["/"+instanceId]); err != nil {
+			if err = exec.zeppelinClient.DeleteNote(ctx, notesMap["/"+instanceId]); err != nil {
 				logger.Warn().Msg(fmt.Sprintf("delete note failed,notename %s .noteid is %s,reason is %s", "/"+instanceId, notesMap["/"+instanceId], err.Error())).Fire()
 			}
 		}
-		if noteId, err = exec.zeppelinClient.CreateNote(instanceId); err != nil {
+		if noteId, err = exec.zeppelinClient.CreateNote(ctx, instanceId); err != nil {
 			logger.Warn().Msg(fmt.Sprintf("recreate note failed,note name %s ,reason is %s", instanceId, err.Error())).Fire()
 			return "", err
 		}
@@ -710,24 +740,24 @@ func (exec *FlinkExecutor) initNote(ctx context.Context, interceptor string, ins
 	for k, v := range properties {
 		builder.WriteString(fmt.Sprintf("%v %v\n", k, v))
 	}
-	confParagraphId, err := exec.zeppelinClient.AddParagraph(noteId, "conf", builder.String())
+	confParagraphId, err := exec.zeppelinClient.AddParagraph(ctx, noteId, "conf", builder.String())
 	if err != nil {
 		logger.Warn().Msg(fmt.Sprintf("add conf paragraph failed,noteid %s ,reason is %s", noteId, err.Error())).Fire()
 		return "", err
 	}
-	if _, err = exec.zeppelinClient.ExecuteParagraph(noteId, confParagraphId); err != nil {
+	if _, err = exec.zeppelinClient.ExecuteParagraph(ctx, noteId, confParagraphId); err != nil {
 		logger.Warn().Msg(fmt.Sprintf("execute conf paragraph failed,noteid %s ,reason is %s", noteId, err.Error())).Fire()
 		return "", err
 	}
 	builder.Reset()
 	builder.WriteString("%" + interceptor + "(init=true)")
-	initParagraphId, err := exec.zeppelinClient.AddParagraph(noteId, "init", builder.String())
+	initParagraphId, err := exec.zeppelinClient.AddParagraph(ctx, noteId, "init", builder.String())
 	if err != nil {
 		logger.Warn().Msg(fmt.Sprintf("add init paragraph failed,note id %s ,reason is %s", noteId, err.Error())).Fire()
 		return "", err
 	}
 
-	if result, err = exec.zeppelinClient.ExecuteParagraph(noteId, initParagraphId); err != nil {
+	if result, err = exec.zeppelinClient.ExecuteParagraph(ctx, noteId, initParagraphId); err != nil {
 		logger.Warn().Msg(fmt.Sprintf("execute init paragraph failed,note id %s ,reason is %s", noteId, err.Error())).Fire()
 		return "", err
 	}

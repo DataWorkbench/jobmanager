@@ -34,7 +34,7 @@ func init() {
 	client = jobpb.NewJobmanagerClient(conn)
 }
 
-func Test_JobID(t *testing.T){
+func Test_JobID(t *testing.T) {
 	var flinkId = "f7083d6497d90bb8e408c9419d8d858e"
 	fmt.Println(len(flinkId))
 }
@@ -82,11 +82,25 @@ func Test_InitJar(t *testing.T) {
 func Test_Run(t *testing.T) {
 	req := request.SubmitFlinkJob{
 		InstanceId:  instanceId,
-		NoteId:      "2GUMB3ZMX",
-		ParagraphId: "paragraph_1642153522745_223731301",
+		NoteId:      "2GUZUBUCJ",
+		ParagraphId: "paragraph_1642342087611_47669399",
 		Type:        model.StreamJob_SQL,
 	}
 	job, err := client.SubmitFlinkJob(ctx, &req)
 	require.Nil(t, err)
 	fmt.Println(job)
+}
+
+func Test_GetInfo(t *testing.T) {
+	req := request.GetFlinkJob{
+		FlinkId:   "6a96262d85938151cecc75c20da039ef",
+		SpaceId:   spaceId,
+		ClusterId: clusterId,
+	}
+	job, err := client.GetFlinkJob(ctx, &req)
+	if err != nil {
+		t.Error(err)
+	} else {
+		fmt.Println(job)
+	}
 }

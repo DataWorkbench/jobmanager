@@ -101,24 +101,17 @@ func Start() (err error) {
 		return
 	}
 
+	flinkClient := flink.NewClient(ctx, nil)
+
+	zeppelinClient := zeppelin.NewClient(ctx, nil, cfg.ZeppelinAddress)
+
 	//if etcdClient, err = getcd.NewClient(ctx, cfg.ETCD); err != nil {
 	//	return
 	//}
 
 	rpcServer.Register(func(s *grpc.Server) {
-		zeppelinConfig := zeppelin.ClientConfig{
-			ZeppelinRestUrl: cfg.ZeppelinAddress,
-			Timeout:         15000 * time.Millisecond,
-			RetryCount:      0,
-			QueryInterval:   2000,
-		}
-		flinkConfig := flink.ClientConfig{
-			Timeout:       15000 * time.Millisecond,
-			RetryCount:    0,
-			QueryInterval: 0,
-		}
 		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(service.NewJobManagerService(ctx, db, udfClient, engineClient,
-			resourceClient, zeppelinConfig, flinkConfig, etcdClient)))
+			resourceClient, flinkClient, zeppelinClient, etcdClient)))
 	})
 
 	sigGroup := []os.Signal{syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM}
