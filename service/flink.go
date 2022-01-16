@@ -147,7 +147,7 @@ func (exec *FlinkExecutor) Release(ctx context.Context, instanceId string, noteI
 	var err error
 	logger := glog.FromContext(ctx)
 	if err = exec.zeppelinClient.DeleteNote(noteId); err != nil {
-		logger.Warn().Msg(fmt.Sprintf("delete note failed,noteid is %s,reason is %s", noteId, err.Error()))
+		logger.Warn().Msg(fmt.Sprintf("delete note failed,noteid is %s,reason is %s", noteId, err.Error())).Fire()
 	}
 	return exec.deleteResult(ctx, instanceId)
 }
@@ -267,10 +267,13 @@ func (exec *FlinkExecutor) initJar(ctx context.Context, req *request.InitFlinkJo
 	localJarPath := "/tmp/" + jarName
 	initBuilder.WriteString(fmt.Sprintf("hdfs dfs -get %v %v\n", jarUrl, localJarPath))
 	udfJars := exec.getUDFJars(req.GetSpaceId(), udfs)
+	logger.Info().Msg(fmt.Sprintf("jar's udfJars is %s", udfJars))
 	for index, udf := range strings.Split(udfJars, ",") {
-		var src = fmt.Sprintf("/tmp/%v-%d.jar", udf, index)
-		initBuilder.WriteString(fmt.Sprintf("hdfs dfs -get %v %v\n", udf, src))
-		runBuilder.WriteString(fmt.Sprintf(" -C %s", src))
+		if len(udf) == 20 {
+			var src = fmt.Sprintf("/tmp/%v-%d.jar", udf, index)
+			initBuilder.WriteString(fmt.Sprintf("hdfs dfs -get %v %v\n", udf, src))
+			runBuilder.WriteString(fmt.Sprintf(" -C %s", src))
+		}
 	}
 
 	if req.GetArgs().GetParallelism() > 0 {
@@ -290,7 +293,7 @@ func (exec *FlinkExecutor) initJar(ctx context.Context, req *request.InitFlinkJo
 	} else if result != nil && !result.Status.IsFinished() {
 		for _, re := range result.Results {
 			if strings.EqualFold(re.Type, "TEXT") {
-				logger.Warn().Msg(fmt.Sprintf("init jar failed,reason is %s", re.Data))
+				logger.Warn().Msg(fmt.Sprintf("init jar failed,reason is %s", re.Data)).Fire()
 			}
 		}
 		return "", "", nil, qerror.ZeppelinInitFailed
