@@ -376,7 +376,7 @@ func (exec *FlinkExecutor) runSql(ctx context.Context, instanceId string, noteId
 			}
 			return result, nil
 		}
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 10)
 	}
 }
 
@@ -433,7 +433,7 @@ func (exec *FlinkExecutor) runJar(ctx context.Context, instanceId string, noteId
 			}
 			return result, nil
 		}
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 10)
 	}
 }
 
