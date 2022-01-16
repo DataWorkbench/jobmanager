@@ -615,26 +615,28 @@ func (exec *FlinkExecutor) registerUDF(ctx context.Context, noteId string, udfs 
 				return nil, err
 			}
 			start := time.Now().Unix()
-			for (start - time.Now().Unix()) < 5000 {
+			for (start - time.Now().Unix()) < 10000 {
 				if result, err = exec.zeppelinClient.QueryParagraphResult(ctx, noteId, result.ParagraphId); err != nil {
 					return nil, err
 				}
 				if !result.Status.IsRunning() && !result.Status.IsPending() {
 					break
 				}
+				time.Sleep(time.Second * 2)
 			}
 		case model.UDFInfo_Python:
 			if result, err = exec.zeppelinClient.Submit(ctx, "flink", "ipyflink", noteId, udf.code); err != nil {
 				return nil, err
 			}
 			start := time.Now().Unix()
-			for (start - time.Now().Unix()) < 5000 {
+			for (start - time.Now().Unix()) < 10000 {
 				if result, err = exec.zeppelinClient.QueryParagraphResult(ctx, noteId, result.ParagraphId); err != nil {
 					return nil, err
 				}
 				if !result.Status.IsRunning() && !result.Status.IsPending() {
 					break
 				}
+				time.Sleep(time.Second * 2)
 			}
 		}
 	}
