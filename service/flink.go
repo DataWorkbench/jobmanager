@@ -287,7 +287,7 @@ func (exec *FlinkExecutor) initJar(ctx context.Context, req *request.InitFlinkJo
 	logger.Info().Msg(fmt.Sprintf("the jar job init code is %s", initCode)).Fire()
 	runCode := runBuilder.String()
 	logger.Info().Msg(fmt.Sprintf("the jar job run code is %s", runCode)).Fire()
-	result, err := exec.zeppelinClient.Submit("sh", "", noteId, initCode)
+	result, err := exec.zeppelinClient.Execute("sh", "", noteId, initCode)
 	if err != nil {
 		return "", "", nil, err
 	} else if result != nil && !result.Status.IsFinished() {
