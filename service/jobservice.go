@@ -85,9 +85,9 @@ func (jm *JobManagerService) GetFlinkJob(ctx context.Context, flinkId string, sp
 		res.State = model.StreamJobInst_Failed
 	case "FAILING", "INITIALIZING", "RESTARTING", "RECONCILING", "CANCELLING":
 		res.State = model.StreamJobInst_Pending
-	case "CREATED", "CANCELED", "SUSPENDED":
+	case "CREATED", "CANCELED", "SUSPENDED","FINISHED":
 		res.State = model.StreamJobInst_Succeed
-	case "RUNNING", "FINISHED":
+	case "RUNNING":
 		res.State = model.StreamJobInst_Running
 	}
 	if job.Exceptions != nil {

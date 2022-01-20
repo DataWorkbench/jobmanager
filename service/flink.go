@@ -446,9 +446,9 @@ func (exec *FlinkExecutor) transResult(result *zeppelin.ParagraphResult) (string
 		}
 	}
 	switch result.Status {
-	case zeppelin.RUNNING:
+	case zeppelin.RUNNING, zeppelin.FINISHED:
 		status = model.StreamJobInst_Running
-	case zeppelin.ABORT, zeppelin.FINISHED:
+	case zeppelin.ABORT:
 		status = model.StreamJobInst_Succeed
 	case zeppelin.ERROR:
 		status = model.StreamJobInst_Failed
