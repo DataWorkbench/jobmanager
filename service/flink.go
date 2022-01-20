@@ -538,7 +538,7 @@ func (exec *FlinkExecutor) getResult(ctx context.Context, instanceId string) (*m
 func (exec *FlinkExecutor) getBaseConnectors(builtInConnectors []string, flinkVersion string) string {
 	libDir := constants.FlinkDefaultConnectorPath[flinkVersion]
 	var executeJars string
-	connectorSet := map[string]string{}
+	connectorSet := map[string]string{libDir + "/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar,": ""}
 	connectorJarMap := constants.FlinkConnectorJarMap[flinkVersion]
 	for _, connector := range builtInConnectors {
 		jars := connectorJarMap[connector]
