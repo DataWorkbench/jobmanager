@@ -2,22 +2,23 @@ package utils
 
 import (
 	"context"
+
 	"github.com/DataWorkbench/common/grpcwrap"
-	"github.com/DataWorkbench/gproto/pkg/enginepb"
-	"github.com/DataWorkbench/gproto/pkg/request"
+	"github.com/DataWorkbench/gproto/pkg/service/pbsvcengine"
+	"github.com/DataWorkbench/gproto/pkg/types/pbrequest"
 )
 
 type EngineClient struct {
-	Client enginepb.EngineClient
+	Client pbsvcengine.EngineClient
 }
 
 func NewEngineClient(conn *grpcwrap.ClientConn) (c EngineClient, err error) {
-	c.Client = enginepb.NewEngineClient(conn)
+	c.Client = pbsvcengine.NewEngineClient(conn)
 	return c, nil
 }
 
 func (e EngineClient) GetEngineInfo(ctx context.Context, spaceId string, clusterId string) (url string, version string, err error) {
-	api, err := e.Client.DescribeFlinkClusterAPI(ctx, &request.DescribeFlinkClusterAPI{
+	api, err := e.Client.DescribeFlinkClusterAPI(ctx, &pbrequest.DescribeFlinkClusterAPI{
 		SpaceId:   spaceId,
 		ClusterId: clusterId,
 	})

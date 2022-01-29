@@ -33,7 +33,7 @@ type Config struct {
 	MetricsServer         *metrics.Config        `json:"metrics_server" yaml:"metrics_server" env:"METRICS_SERVER"      validate:"required"`
 	MySQL                 *gormwrap.MySQLConfig  `json:"mysql"          yaml:"mysql"          env:"MYSQL"               validate:"required"`
 	//ETCD                  *getcd.Config          `json:"etcd"           yaml:"etcd"           env:"ETCD"                validate:"required"`
-	Tracer                *gtrace.Config         `json:"tracer"         yaml:"tracer"         env:"TRACER"              validate:"required"`
+	Tracer *gtrace.Config `json:"tracer"         yaml:"tracer"         env:"TRACER"              validate:"required"`
 }
 
 func loadFromFile(cfg *Config) (err error) {

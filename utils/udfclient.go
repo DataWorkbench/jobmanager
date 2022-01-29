@@ -4,25 +4,25 @@ import (
 	"context"
 
 	"github.com/DataWorkbench/common/grpcwrap"
-	"github.com/DataWorkbench/gproto/pkg/model"
-	"github.com/DataWorkbench/gproto/pkg/request"
-	"github.com/DataWorkbench/gproto/pkg/response"
-	"github.com/DataWorkbench/gproto/pkg/udfpb"
+	"github.com/DataWorkbench/gproto/pkg/service/pbsvcudf"
+	"github.com/DataWorkbench/gproto/pkg/types/pbmodel"
+	"github.com/DataWorkbench/gproto/pkg/types/pbrequest"
+	"github.com/DataWorkbench/gproto/pkg/types/pbresponse"
 )
 
 type UdfClient struct {
-	client udfpb.UdfmanagerClient
+	client pbsvcudf.UdfManageClient
 }
 
 func NewUdfClient(conn *grpcwrap.ClientConn) (c UdfClient, err error) {
-	c.client = udfpb.NewUdfmanagerClient(conn)
+	c.client = pbsvcudf.NewUdfManageClient(conn)
 	return c, nil
 }
 
-func (s *UdfClient) DescribeUdfManager(ctx context.Context, ID string) (udfLanguage model.UDFInfo_Language, name string, define string, err error) {
+func (s *UdfClient) DescribeUdfManager(ctx context.Context, ID string) (udfLanguage pbmodel.UDFInfo_Language, name string, define string, err error) {
 	var (
-		req  request.DescribeUDF
-		resp *response.DescribeUDF
+		req  pbrequest.DescribeUDF
+		resp *pbresponse.DescribeUDF
 	)
 
 	req.UdfId = ID

@@ -3,23 +3,24 @@ package tests
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/DataWorkbench/common/grpcwrap"
 	"github.com/DataWorkbench/glog"
-	"github.com/DataWorkbench/gproto/pkg/flinkpb"
-	"github.com/DataWorkbench/gproto/pkg/jobpb"
-	"github.com/DataWorkbench/gproto/pkg/model"
-	"github.com/DataWorkbench/gproto/pkg/request"
+	"github.com/DataWorkbench/gproto/pkg/service/pbsvcdeveloper"
+	"github.com/DataWorkbench/gproto/pkg/types/pbmodel"
+	"github.com/DataWorkbench/gproto/pkg/types/pbmodel/pbflink"
+	"github.com/DataWorkbench/gproto/pkg/types/pbrequest"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 var (
-	client      jobpb.JobmanagerClient
-	ctx         context.Context
-	spaceId     = "wks-0123456789012345"
-	instanceId  = "syx-JHGYFjhKwUfaQDHZ"
-	instanceId2 = "syx-JHGYFjhKwUfaQDHQ"
-	clusterId   = "cfi-05636e792cfe5000"
+	client     pbsvcdeveloper.JobManageClient
+	ctx        context.Context
+	spaceId    = "wks-0123456789012345"
+	instanceId = "syx-JHGYFjhKwUfaQDHZ"
+	//instanceId2 = "syx-JHGYFjhKwUfaQDHQ"
+	clusterId = "cfi-05636e792cfe5000"
 )
 
 func init() {
@@ -31,7 +32,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	client = jobpb.NewJobmanagerClient(conn)
+	client = pbsvcdeveloper.NewJobManageClient(conn)
 }
 
 func Test_JobID(t *testing.T) {
@@ -40,22 +41,22 @@ func Test_JobID(t *testing.T) {
 }
 
 func Test_InitSql(t *testing.T) {
-	args := model.StreamJobArgs{
+	args := pbmodel.StreamJobArgs{
 		ClusterId:         clusterId,
 		Udfs:              nil,
 		Connectors:        nil,
 		BuiltInConnectors: nil,
 	}
-	jobType := model.StreamJob_SQL
+	jobType := pbmodel.StreamJob_SQL
 
-	sql := flinkpb.FlinkSQL{Code: "" +
+	sql := pbflink.FlinkSQL{Code: "" +
 		"create table if not exists datagen(id int,name string) with ('connector' = 'datagen','rows-per-second' = '2');\n" +
 		"create table if not exists print(id int,name string) with ('connector' = 'print');\n" +
 		"create table if not exists print2(id int) with ('connector' = 'print');\n" +
 		"-- insert into print select * from datagen;\n" +
 		"-- insert into print2 select id from datagen;\n" +
 		"select * from datagen;"}
-	code := model.StreamJobCode{
+	code := pbmodel.StreamJobCode{
 		Type:      jobType,
 		Operators: nil,
 		Sql:       &sql,
@@ -63,7 +64,7 @@ func Test_InitSql(t *testing.T) {
 		Scala:     nil,
 		Python:    nil,
 	}
-	req := request.InitFlinkJob{
+	req := pbrequest.InitFlinkJob{
 		InstanceId:    instanceId,
 		SpaceId:       spaceId,
 		Args:          &args,
@@ -80,11 +81,11 @@ func Test_InitJar(t *testing.T) {
 }
 
 func Test_Run(t *testing.T) {
-	req := request.SubmitFlinkJob{
+	req := pbrequest.SubmitFlinkJob{
 		InstanceId:  instanceId,
 		NoteId:      "2GUZUBUCJ",
 		ParagraphId: "paragraph_1642342087611_47669399",
-		Type:        model.StreamJob_SQL,
+		Type:        pbmodel.StreamJob_SQL,
 	}
 	job, err := client.SubmitFlinkJob(ctx, &req)
 	require.Nil(t, err)
@@ -92,7 +93,7 @@ func Test_Run(t *testing.T) {
 }
 
 func Test_GetInfo(t *testing.T) {
-	req := request.GetFlinkJob{
+	req := pbrequest.GetFlinkJob{
 		FlinkId:   "6a96262d85938151cecc75c20da039ef",
 		SpaceId:   spaceId,
 		ClusterId: clusterId,

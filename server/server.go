@@ -3,12 +3,13 @@ package server
 import (
 	"context"
 	"fmt"
-	"gorm.io/gorm"
 	"io"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"gorm.io/gorm"
 
 	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/getcd"
@@ -19,12 +20,10 @@ import (
 	"github.com/DataWorkbench/common/utils/buildinfo"
 	"github.com/DataWorkbench/common/zeppelin"
 	"github.com/DataWorkbench/glog"
-	"github.com/DataWorkbench/gproto/pkg/jobpb"
+	"github.com/DataWorkbench/gproto/pkg/service/pbsvcdeveloper"
 	"github.com/DataWorkbench/jobmanager/config"
 	"github.com/DataWorkbench/jobmanager/service"
 	"github.com/DataWorkbench/jobmanager/utils"
-
-	"google.golang.org/grpc"
 )
 
 func Start() (err error) {
@@ -109,10 +108,10 @@ func Start() (err error) {
 	//	return
 	//}
 
-	rpcServer.Register(func(s *grpc.Server) {
-		jobpb.RegisterJobmanagerServer(s, NewJobManagerServer(service.NewJobManagerService(ctx, db, udfClient, engineClient,
-			resourceClient, flinkClient, zeppelinClient, etcdClient)))
-	})
+	jobSvc := NewJobManagerServer(service.NewJobManagerService(ctx, db, udfClient, engineClient,
+		resourceClient, flinkClient, zeppelinClient, etcdClient))
+
+	rpcServer.RegisterService(&pbsvcdeveloper.JobManage_ServiceDesc, jobSvc)
 
 	sigGroup := []os.Signal{syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM}
 	sigChan := make(chan os.Signal, len(sigGroup))

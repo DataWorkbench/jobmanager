@@ -15,8 +15,8 @@ import (
 	"github.com/DataWorkbench/common/qerror"
 	"github.com/DataWorkbench/common/zeppelin"
 	"github.com/DataWorkbench/glog"
-	"github.com/DataWorkbench/gproto/pkg/model"
-	"github.com/DataWorkbench/gproto/pkg/request"
+	"github.com/DataWorkbench/gproto/pkg/types/pbmodel"
+	"github.com/DataWorkbench/gproto/pkg/types/pbrequest"
 	"github.com/DataWorkbench/jobmanager/utils"
 
 	"github.com/google/uuid"
@@ -43,7 +43,7 @@ type FlinkExecutor struct {
 }
 
 type Udf struct {
-	udfType model.UDFInfo_Language
+	udfType pbmodel.UDFInfo_Language
 	code    string
 }
 
@@ -60,7 +60,7 @@ func NewFlinkExecutor(ctx context.Context, db *gorm.DB, engineClient utils.Engin
 	}
 }
 
-func (exec *FlinkExecutor) InitJob(ctx context.Context, req *request.InitFlinkJob) (string, string, error) {
+func (exec *FlinkExecutor) InitJob(ctx context.Context, req *pbrequest.InitFlinkJob) (string, string, error) {
 	var (
 		noteId      string
 		paragraphId string
@@ -99,12 +99,12 @@ func (exec *FlinkExecutor) InitJob(ctx context.Context, req *request.InitFlinkJo
 		return "", "", err
 	}
 	switch req.GetCode().GetType() {
-	case model.StreamJob_SQL:
+	case pbmodel.StreamJob_SQL:
 		if noteId, paragraphId, result, err = exec.initSql(ctx, req, udfs, logger); err != nil {
 			return "", "", err
 		}
 		return noteId, paragraphId, nil
-	case model.StreamJob_Jar:
+	case pbmodel.StreamJob_Jar:
 		if noteId, paragraphId, result, err = exec.initJar(ctx, req, udfs, logger); err != nil {
 			return "", "", err
 		}
@@ -114,7 +114,7 @@ func (exec *FlinkExecutor) InitJob(ctx context.Context, req *request.InitFlinkJo
 	return "", "", nil
 }
 
-func (exec *FlinkExecutor) SubmitJob(ctx context.Context, instanceId string, noteId string, paragraphId string, jobType model.StreamJob_Type) (*zeppelin.ParagraphResult, error) {
+func (exec *FlinkExecutor) SubmitJob(ctx context.Context, instanceId string, noteId string, paragraphId string, jobType pbmodel.StreamJob_Type) (*zeppelin.ParagraphResult, error) {
 	logger := glog.FromContext(ctx)
 	result, err := exec.preCheck(ctx, instanceId)
 	if err != nil {
@@ -124,9 +124,9 @@ func (exec *FlinkExecutor) SubmitJob(ctx context.Context, instanceId string, not
 	}
 
 	switch jobType {
-	case model.StreamJob_SQL:
+	case pbmodel.StreamJob_SQL:
 		return exec.runSql(ctx, instanceId, noteId, paragraphId, logger)
-	case model.StreamJob_Jar:
+	case pbmodel.StreamJob_Jar:
 		return exec.runJar(ctx, instanceId, noteId, paragraphId, logger)
 	}
 	logger.Error().Msg(fmt.Sprintf("job type not match,only support jar and sql,current type is %s", jobType.Type()))
@@ -185,9 +185,9 @@ func (exec *FlinkExecutor) CancelJob(ctx context.Context, flinkId string, spaceI
 	return exec.flinkClient.CancelJob(ctx, flinkUrl, flinkId)
 }
 
-func (exec *FlinkExecutor) ValidateCode(ctx context.Context, jobCode *request.ValidateFlinkJob) (bool, string, error) {
+func (exec *FlinkExecutor) ValidateCode(ctx context.Context, jobCode *pbrequest.ValidateFlinkJob) (bool, string, error) {
 	switch jobCode.GetCode().GetType() {
-	case model.StreamJob_SQL:
+	case pbmodel.StreamJob_SQL:
 		builder := strings.Builder{}
 		builder.WriteString("java -jar /zeppelin/flink/depends/sql-validator.jar ")
 		//builder.WriteString("java -jar /Users/apple/develop/java/sql-vadilator/target/sql-validator.jar ")
@@ -220,7 +220,7 @@ func (exec *FlinkExecutor) ValidateCode(ctx context.Context, jobCode *request.Va
 	}
 }
 
-func (exec *FlinkExecutor) initSql(ctx context.Context, req *request.InitFlinkJob, udfs []*Udf, logger *glog.Logger) (string, string, *zeppelin.ParagraphResult, error) {
+func (exec *FlinkExecutor) initSql(ctx context.Context, req *pbrequest.InitFlinkJob, udfs []*Udf, logger *glog.Logger) (string, string, *zeppelin.ParagraphResult, error) {
 	properties, err := exec.getGlobalProperties(ctx, req, udfs)
 	if err != nil {
 		return "", "", nil, err
@@ -268,7 +268,7 @@ func (exec *FlinkExecutor) initSql(ctx context.Context, req *request.InitFlinkJo
 	return noteId, paragraphId, result, nil
 }
 
-func (exec *FlinkExecutor) initJar(ctx context.Context, req *request.InitFlinkJob, udfs []*Udf, logger *glog.Logger) (string, string, *zeppelin.ParagraphResult, error) {
+func (exec *FlinkExecutor) initJar(ctx context.Context, req *pbrequest.InitFlinkJob, udfs []*Udf, logger *glog.Logger) (string, string, *zeppelin.ParagraphResult, error) {
 	properties := map[string]string{}
 	properties["shell.command.timeout.millisecs"] = "30000"
 	noteId, err := exec.initNote(ctx, SHELL, req.GetInstanceId(), properties)
@@ -437,9 +437,9 @@ func (exec *FlinkExecutor) runJar(ctx context.Context, instanceId string, noteId
 	}
 }
 
-func (exec *FlinkExecutor) transResult(result *zeppelin.ParagraphResult) (string, model.StreamJobInst_State) {
+func (exec *FlinkExecutor) transResult(result *zeppelin.ParagraphResult) (string, pbmodel.StreamInstance_State) {
 	var data string
-	var status model.StreamJobInst_State
+	var status pbmodel.StreamInstance_State
 	for _, re := range result.Results {
 		if strings.EqualFold("TEXT", re.Type) {
 			data = re.Data
@@ -447,13 +447,13 @@ func (exec *FlinkExecutor) transResult(result *zeppelin.ParagraphResult) (string
 	}
 	switch result.Status {
 	case zeppelin.RUNNING, zeppelin.FINISHED:
-		status = model.StreamJobInst_Running
+		status = pbmodel.StreamInstance_Running
 	case zeppelin.ABORT:
-		status = model.StreamJobInst_Succeed
+		status = pbmodel.StreamInstance_Succeed
 	case zeppelin.ERROR:
-		status = model.StreamJobInst_Failed
+		status = pbmodel.StreamInstance_Failed
 	default:
-		status = model.StreamJobInst_Running
+		status = pbmodel.StreamInstance_Running
 	}
 	return data, status
 }
@@ -481,7 +481,7 @@ func (exec *FlinkExecutor) preCheck(ctx context.Context, instanceId string) (*ze
 }
 
 func (exec *FlinkExecutor) preHandle(ctx context.Context, instanceId string, noteId string, paragraphId string) error {
-	jobInfo := model.JobInfo{
+	jobInfo := pbmodel.JobInfo{
 		InstanceId:  instanceId,
 		NoteId:      noteId,
 		ParagraphId: paragraphId,
@@ -496,7 +496,7 @@ func (exec *FlinkExecutor) postHandle(ctx context.Context, instanceId string, no
 			result.Status = zeppelin.ABORT
 		} else {
 			data, state := exec.transResult(result)
-			jobInfo := model.JobInfo{
+			jobInfo := pbmodel.JobInfo{
 				InstanceId:  instanceId,
 				NoteId:      noteId,
 				ParagraphId: result.ParagraphId,
@@ -511,7 +511,7 @@ func (exec *FlinkExecutor) postHandle(ctx context.Context, instanceId string, no
 	}
 }
 
-func (exec *FlinkExecutor) upsertResult(ctx context.Context, jobInfo *model.JobInfo) error {
+func (exec *FlinkExecutor) upsertResult(ctx context.Context, jobInfo *pbmodel.JobInfo) error {
 	db := exec.db.WithContext(ctx)
 	return db.Table(JobManager).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "instance_id"}},
@@ -520,11 +520,11 @@ func (exec *FlinkExecutor) upsertResult(ctx context.Context, jobInfo *model.JobI
 }
 
 func (exec *FlinkExecutor) deleteResult(ctx context.Context, instanceId string) error {
-	return exec.db.WithContext(ctx).Table(JobManager).Where("instance_id = ?", instanceId).Delete(&model.JobInfo{}).Error
+	return exec.db.WithContext(ctx).Table(JobManager).Where("instance_id = ?", instanceId).Delete(&pbmodel.JobInfo{}).Error
 }
 
-func (exec *FlinkExecutor) getResult(ctx context.Context, instanceId string) (*model.JobInfo, error) {
-	var jobInfo model.JobInfo
+func (exec *FlinkExecutor) getResult(ctx context.Context, instanceId string) (*pbmodel.JobInfo, error) {
+	var jobInfo pbmodel.JobInfo
 	db := exec.db.WithContext(ctx)
 	if err := db.Table(JobManager).Clauses(clause.Locking{Strength: "UPDATE"}).Where("instance_id", instanceId).First(&jobInfo).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -569,7 +569,7 @@ func (exec *FlinkExecutor) getUDFs(ctx context.Context, udfIds []string) ([]*Udf
 	var udfCodes []*Udf
 	for _, udfId := range udfIds {
 		var (
-			udfLanguage model.UDFInfo_Language
+			udfLanguage pbmodel.UDFInfo_Language
 			udfDefine   string
 			udfName     string
 		)
@@ -578,7 +578,7 @@ func (exec *FlinkExecutor) getUDFs(ctx context.Context, udfIds []string) ([]*Udf
 			return nil, err
 		}
 
-		if udfLanguage != model.UDFInfo_Java {
+		if udfLanguage != pbmodel.UDFInfo_Java {
 			udfDefine = strings.Replace(udfDefine, UDFQuote, udfName, -1)
 		}
 		udf := Udf{
@@ -593,7 +593,7 @@ func (exec *FlinkExecutor) getUDFs(ctx context.Context, udfIds []string) ([]*Udf
 func (exec *FlinkExecutor) getUDFJars(spaceId string, udfs []*Udf) string {
 	builder := strings.Builder{}
 	for _, udf := range udfs {
-		if udf.udfType == model.UDFInfo_Java {
+		if udf.udfType == pbmodel.UDFInfo_Java {
 			builder.WriteString("hdfs://hdfs-k8s/" + spaceId + "/" + udf.code + ".jar,")
 		}
 	}
@@ -610,7 +610,7 @@ func (exec *FlinkExecutor) registerUDF(ctx context.Context, noteId string, udfs 
 	var err error
 	for _, udf := range udfs {
 		switch udf.udfType {
-		case model.UDFInfo_Scala:
+		case pbmodel.UDFInfo_Scala:
 			if result, err = exec.zeppelinClient.Submit(ctx, "flink", "", noteId, udf.code); err != nil {
 				return nil, err
 			}
@@ -624,7 +624,7 @@ func (exec *FlinkExecutor) registerUDF(ctx context.Context, noteId string, udfs 
 				}
 				time.Sleep(time.Second * 2)
 			}
-		case model.UDFInfo_Python:
+		case pbmodel.UDFInfo_Python:
 			if result, err = exec.zeppelinClient.Submit(ctx, "flink", "ipyflink", noteId, udf.code); err != nil {
 				return nil, err
 			}
@@ -654,7 +654,7 @@ func (exec *FlinkExecutor) getFlinkMessage(ctx context.Context, spaceId string, 
 	return flinkUrl, flinkVersion, nil
 }
 
-func (exec *FlinkExecutor) getGlobalProperties(ctx context.Context, info *request.InitFlinkJob, udfs []*Udf) (map[string]string, error) {
+func (exec *FlinkExecutor) getGlobalProperties(ctx context.Context, info *pbrequest.InitFlinkJob, udfs []*Udf) (map[string]string, error) {
 	var (
 		properties   = map[string]string{}
 		flinkUrl     string
