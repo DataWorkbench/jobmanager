@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/DataWorkbench/common/grpcwrap"
-	"github.com/DataWorkbench/gproto/pkg/service/pbsvcudf"
-	"github.com/DataWorkbench/gproto/pkg/types/pbmodel"
-	"github.com/DataWorkbench/gproto/pkg/types/pbrequest"
-	"github.com/DataWorkbench/gproto/pkg/types/pbresponse"
+	"github.com/DataWorkbench/gproto/xgo/service/pbsvcudf"
+	"github.com/DataWorkbench/gproto/xgo/types/pbmodel"
+	"github.com/DataWorkbench/gproto/xgo/types/pbrequest"
+	"github.com/DataWorkbench/gproto/xgo/types/pbresponse"
 )
 
 type UdfClient struct {

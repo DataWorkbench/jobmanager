@@ -15,8 +15,8 @@ import (
 	"github.com/DataWorkbench/common/qerror"
 	"github.com/DataWorkbench/common/zeppelin"
 	"github.com/DataWorkbench/glog"
-	"github.com/DataWorkbench/gproto/pkg/types/pbmodel"
-	"github.com/DataWorkbench/gproto/pkg/types/pbrequest"
+	"github.com/DataWorkbench/gproto/xgo/types/pbmodel"
+	"github.com/DataWorkbench/gproto/xgo/types/pbrequest"
 	"github.com/DataWorkbench/jobmanager/utils"
 
 	"github.com/google/uuid"

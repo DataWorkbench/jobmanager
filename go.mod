@@ -3,9 +3,9 @@ module github.com/DataWorkbench/jobmanager
 go 1.15
 
 require (
-	github.com/DataWorkbench/common v0.0.0-20220129200420-0c09733eea52
+	github.com/DataWorkbench/common v0.0.0-20220203115821-93c5866a3fef
 	github.com/DataWorkbench/glog v0.0.0-20210809050640-4960fd6de6ab
-	github.com/DataWorkbench/gproto v0.0.0-20220129195357-34752dda1fc0
+	github.com/DataWorkbench/gproto v0.0.0-20220203115455-814de350e0e0
 	github.com/DataWorkbench/loader v0.0.0-20201119073611-6f210eb11a8c
 	github.com/go-playground/validator/v10 v10.4.1
 	github.com/google/uuid v1.1.2

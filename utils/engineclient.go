@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/DataWorkbench/common/grpcwrap"
-	"github.com/DataWorkbench/gproto/pkg/service/pbsvcengine"
-	"github.com/DataWorkbench/gproto/pkg/types/pbrequest"
+	"github.com/DataWorkbench/gproto/xgo/service/pbsvcengine"
+	"github.com/DataWorkbench/gproto/xgo/types/pbrequest"
 )
 
 type EngineClient struct {

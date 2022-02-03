@@ -20,7 +20,7 @@ import (
 	"github.com/DataWorkbench/common/utils/buildinfo"
 	"github.com/DataWorkbench/common/zeppelin"
 	"github.com/DataWorkbench/glog"
-	"github.com/DataWorkbench/gproto/pkg/service/pbsvcdeveloper"
+	"github.com/DataWorkbench/gproto/xgo/service/pbsvcdeveloper"
 	"github.com/DataWorkbench/jobmanager/config"
 	"github.com/DataWorkbench/jobmanager/service"
 	"github.com/DataWorkbench/jobmanager/utils"

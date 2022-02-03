@@ -7,10 +7,10 @@ import (
 
 	"github.com/DataWorkbench/common/grpcwrap"
 	"github.com/DataWorkbench/glog"
-	"github.com/DataWorkbench/gproto/pkg/service/pbsvcdeveloper"
-	"github.com/DataWorkbench/gproto/pkg/types/pbmodel"
-	"github.com/DataWorkbench/gproto/pkg/types/pbmodel/pbflink"
-	"github.com/DataWorkbench/gproto/pkg/types/pbrequest"
+	"github.com/DataWorkbench/gproto/xgo/service/pbsvcdeveloper"
+	"github.com/DataWorkbench/gproto/xgo/types/pbmodel"
+	"github.com/DataWorkbench/gproto/xgo/types/pbmodel/pbflink"
+	"github.com/DataWorkbench/gproto/xgo/types/pbrequest"
 	"github.com/stretchr/testify/require"
 )
 

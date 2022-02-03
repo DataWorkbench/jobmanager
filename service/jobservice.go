@@ -6,9 +6,9 @@ import (
 	"github.com/DataWorkbench/common/flink"
 	"github.com/DataWorkbench/common/getcd"
 	"github.com/DataWorkbench/common/zeppelin"
-	"github.com/DataWorkbench/gproto/pkg/types/pbmodel"
-	"github.com/DataWorkbench/gproto/pkg/types/pbrequest"
-	"github.com/DataWorkbench/gproto/pkg/types/pbresponse"
+	"github.com/DataWorkbench/gproto/xgo/types/pbmodel"
+	"github.com/DataWorkbench/gproto/xgo/types/pbrequest"
+	"github.com/DataWorkbench/gproto/xgo/types/pbresponse"
 	"github.com/DataWorkbench/jobmanager/utils"
 
 	"gorm.io/gorm"

@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/DataWorkbench/common/grpcwrap"
-	"github.com/DataWorkbench/gproto/pkg/service/pbsvcresource"
-	"github.com/DataWorkbench/gproto/pkg/types/pbrequest"
+	"github.com/DataWorkbench/gproto/xgo/service/pbsvcresource"
+	"github.com/DataWorkbench/gproto/xgo/types/pbrequest"
 )
 
 type ResourceClient struct {
