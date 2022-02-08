@@ -39,18 +39,18 @@ func Start() (err error) {
 	ctx := glog.WithContext(context.Background(), lp)
 
 	var (
-		db             *gorm.DB
-		rpcServer      *grpcwrap.Server
-		metricServer   *metrics.Server
-		tracer         gtrace.Tracer
-		tracerCloser   io.Closer
-		engineConn     *grpcwrap.ClientConn
-		resourceConn   *grpcwrap.ClientConn
-		udfConn        *grpcwrap.ClientConn
-		engineClient   utils.EngineClient
-		resourceClient utils.ResourceClient
-		udfClient      utils.UdfClient
-		etcdClient     *getcd.Client
+		db              *gorm.DB
+		rpcServer       *grpcwrap.Server
+		metricServer    *metrics.Server
+		tracer          gtrace.Tracer
+		tracerCloser    io.Closer
+		spaceManageConn *grpcwrap.ClientConn
+		resourceConn    *grpcwrap.ClientConn
+		udfConn         *grpcwrap.ClientConn
+		engineClient    utils.ClusterManagerClient
+		resourceClient  utils.ResourceClient
+		udfClient       utils.UdfClient
+		etcdClient      *getcd.Client
 	)
 
 	defer func() {
@@ -76,11 +76,11 @@ func Start() (err error) {
 		return
 	}
 
-	if engineConn, err = grpcwrap.NewConn(ctx, cfg.EngineManagerServer); err != nil {
+	if spaceManageConn, err = grpcwrap.NewConn(ctx, cfg.SpaceManager); err != nil {
 		return
 	}
 
-	if engineClient, err = utils.NewEngineClient(engineConn); err != nil {
+	if engineClient, err = utils.NewClusterManagerClient(spaceManageConn); err != nil {
 		return
 	}
 

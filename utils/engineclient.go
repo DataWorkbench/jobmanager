@@ -4,20 +4,20 @@ import (
 	"context"
 
 	"github.com/DataWorkbench/common/grpcwrap"
-	"github.com/DataWorkbench/gproto/xgo/service/pbsvcengine"
+	"github.com/DataWorkbench/gproto/xgo/service/pbsvcspace"
 	"github.com/DataWorkbench/gproto/xgo/types/pbrequest"
 )
 
-type EngineClient struct {
-	Client pbsvcengine.EngineClient
+type ClusterManagerClient struct {
+	Client pbsvcspace.ClusterManageClient
 }
 
-func NewEngineClient(conn *grpcwrap.ClientConn) (c EngineClient, err error) {
-	c.Client = pbsvcengine.NewEngineClient(conn)
+func NewClusterManagerClient(conn *grpcwrap.ClientConn) (c ClusterManagerClient, err error) {
+	c.Client = pbsvcspace.NewClusterManageClient(conn)
 	return c, nil
 }
 
-func (e EngineClient) GetEngineInfo(ctx context.Context, spaceId string, clusterId string) (url string, version string, err error) {
+func (e ClusterManagerClient) GetEngineInfo(ctx context.Context, spaceId string, clusterId string) (url string, version string, err error) {
 	api, err := e.Client.DescribeFlinkClusterAPI(ctx, &pbrequest.DescribeFlinkClusterAPI{
 		SpaceId:   spaceId,
 		ClusterId: clusterId,

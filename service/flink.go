@@ -35,7 +35,7 @@ const (
 type FlinkExecutor struct {
 	ctx            context.Context
 	db             *gorm.DB
-	engineClient   utils.EngineClient
+	engineClient   utils.ClusterManagerClient
 	udfClient      utils.UdfClient
 	resourceClient utils.ResourceClient
 	flinkClient    *flink.Client
@@ -47,7 +47,7 @@ type Udf struct {
 	code    string
 }
 
-func NewFlinkExecutor(ctx context.Context, db *gorm.DB, engineClient utils.EngineClient, udfClient utils.UdfClient, resourceClient utils.ResourceClient,
+func NewFlinkExecutor(ctx context.Context, db *gorm.DB, engineClient utils.ClusterManagerClient, udfClient utils.UdfClient, resourceClient utils.ResourceClient,
 	flinkClient *flink.Client, zeppelinClient *zeppelin.Client) *FlinkExecutor {
 	return &FlinkExecutor{
 		ctx:            ctx,

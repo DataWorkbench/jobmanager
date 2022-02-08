@@ -20,7 +20,7 @@ type JobManagerService struct {
 	etcd          *getcd.Client
 }
 
-func NewJobManagerService(ctx context.Context, db *gorm.DB, uClient utils.UdfClient, eClient utils.EngineClient,
+func NewJobManagerService(ctx context.Context, db *gorm.DB, uClient utils.UdfClient, eClient utils.ClusterManagerClient,
 	rClient utils.ResourceClient, fClient *flink.Client,
 	zClient *zeppelin.Client, etcdClient *getcd.Client) *JobManagerService {
 	return &JobManagerService{

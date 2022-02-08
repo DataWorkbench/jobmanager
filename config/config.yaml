@@ -4,19 +4,6 @@
 log_level: 1
 zeppelin_address: "127.0.0.1:8080"
 
-enginemanager_server:
-  address: "127.0.0.1:9114"  # required
-  log_level: 2 #  1 => info, 2 => waring, 3 => error, 4 => fatal
-  log_verbosity: 99
-udfmanager_server:
-  address: "127.0.0.1:9106"
-  log_level: 2
-  log_verbosity: 99
-resourcemanager_server:
-  address: "127.0.0.1:9111"
-  log_level: 2
-  log_verbosity: 99
-
 grpc_server:
   address: "127.0.0.1:9105"  # required
   log_level: 2 #  1 => info, 2 => waring, 3 => error, 4 => fatal
@@ -44,3 +31,24 @@ mysql:
 tracer:
   service_name: "jobmanager"
   local_agent: "127.0.0.1:6831"
+
+#enginemanager_server:
+#  address: "127.0.0.1:9114"  # required
+#  log_level: 2 #  1 => info, 2 => waring, 3 => error, 4 => fatal
+#  log_verbosity: 99
+
+udfmanager_server:
+  address: "127.0.0.1:9106"
+  log_level: 2
+  log_verbosity: 99
+
+resourcemanager_server:
+  address: "127.0.0.1:9111"
+  log_level: 2
+  log_verbosity: 99
+
+space_manager:
+  address: "127.0.0.1:9101"
+  log_level: 2
+  log_verbosity: 99
+
