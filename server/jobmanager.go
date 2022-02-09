@@ -34,6 +34,6 @@ func (s *JobManagerServer) GetFlinkJob(ctx context.Context, req *pbrequest.GetFl
 func (s *JobManagerServer) CancelFlinkJob(ctx context.Context, req *pbrequest.CancelFlinkJob) (*pbmodel.EmptyStruct, error) {
 	return &pbmodel.EmptyStruct{}, s.service.CancelFlinkJob(ctx, req.GetFlinkId(), req.GetSpaceId(), req.GetClusterId())
 }
-func (s *JobManagerServer) ValidateFlinkJob(ctx context.Context, req *pbrequest.ValidateFlinkJob) (*pbresponse.StreamJobCodeSyntax, error) {
+func (s *JobManagerServer) ValidateFlinkJob(ctx context.Context, req *pbrequest.ValidateFlinkJob) (*pbresponse.ValidateFlinkJob, error) {
 	return s.service.ValidateFlinkCode(ctx, req)
 }

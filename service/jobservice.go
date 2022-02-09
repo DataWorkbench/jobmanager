@@ -96,16 +96,16 @@ func (jm *JobManagerService) GetFlinkJob(ctx context.Context, flinkId string, sp
 	return &res, nil
 }
 
-func (jm *JobManagerService) ValidateFlinkCode(ctx context.Context, jobCode *pbrequest.ValidateFlinkJob) (*pbresponse.StreamJobCodeSyntax, error) {
-	res := pbresponse.StreamJobCodeSyntax{}
+func (jm *JobManagerService) ValidateFlinkCode(ctx context.Context, jobCode *pbrequest.ValidateFlinkJob) (*pbresponse.ValidateFlinkJob, error) {
+	res := pbresponse.ValidateFlinkJob{}
 
 	if flag, msg, err := jm.flinkExecutor.ValidateCode(ctx, jobCode); err != nil {
 		return nil, err
 	} else {
 		if flag {
-			res.Result = pbresponse.StreamJobCodeSyntax_Correct
+			res.Result = pbresponse.ValidateFlinkJob_Correct
 		} else {
-			res.Result = pbresponse.StreamJobCodeSyntax_Incorrect
+			res.Result = pbresponse.ValidateFlinkJob_Incorrect
 			res.Message = msg
 		}
 		return &res, nil

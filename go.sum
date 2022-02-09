@@ -13,13 +13,12 @@ cloud.google.com/go/storage v1.0.0/go.mod h1:IhtSnM/ZTZV8YYJWCY8RULGVqBDmpoyjwiy
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/DataWorkbench/common v0.0.0-20220208025356-90c16fafaa67 h1:Qkde077rR2mcVUfiqRZefw5PZLmtOoy2UB1pda+STio=
-github.com/DataWorkbench/common v0.0.0-20220208025356-90c16fafaa67/go.mod h1:08PNjziHUBL0UwUSWOLipgMyJKKJLGhuP4XsiVfK9aM=
+github.com/DataWorkbench/common v0.0.0-20220209183900-f8fb25fd4c6c h1:B9GDf39vajqTUkvKF9P1raCaV15KYySG/6xiXmkuCkE=
+github.com/DataWorkbench/common v0.0.0-20220209183900-f8fb25fd4c6c/go.mod h1:+UBlUombovwQXVbDmLf+rm24CXs7KQdJGvfVxDgVuUo=
 github.com/DataWorkbench/glog v0.0.0-20210809050640-4960fd6de6ab h1:qQ6Nd6amyEXvslSxP+62TITT2fbPHKjt0rbyjzzfoP8=
 github.com/DataWorkbench/glog v0.0.0-20210809050640-4960fd6de6ab/go.mod h1:zymxJLXn162xdWYUqIb729S3ZzRQpdTj/LwnW+xxru4=
-github.com/DataWorkbench/gproto v0.0.0-20220203115455-814de350e0e0/go.mod h1:OwdlVaVYjhBox3l6Gj1+0f2uU16r7g7xSb0fPXY0CeI=
-github.com/DataWorkbench/gproto v0.0.0-20220208181903-b5fe90c2e8ec h1:uf5rqen+TOIthiFmSKxAw+pk6LI9SsPKmsciWaGwo5g=
-github.com/DataWorkbench/gproto v0.0.0-20220208181903-b5fe90c2e8ec/go.mod h1:OwdlVaVYjhBox3l6Gj1+0f2uU16r7g7xSb0fPXY0CeI=
+github.com/DataWorkbench/gproto v0.0.0-20220209183645-5bae8e9493e9 h1:UvU+feSVtYhVbeCSTFhX4R0uyFuZYsL2yULQ0jExZbI=
+github.com/DataWorkbench/gproto v0.0.0-20220209183645-5bae8e9493e9/go.mod h1:OwdlVaVYjhBox3l6Gj1+0f2uU16r7g7xSb0fPXY0CeI=
 github.com/DataWorkbench/loader v0.0.0-20201119073611-6f210eb11a8c h1:HcEtluqqKKkBW4wK8YvnCIPxtffbEYBrVr3x/T98vWU=
 github.com/DataWorkbench/loader v0.0.0-20201119073611-6f210eb11a8c/go.mod h1:K2ou8EU8Cto30za+mKbfCXXc8C6BRpyCjg+4E2CRwV4=
 github.com/HdrHistogram/hdrhistogram-go v1.0.1 h1:GX8GAYDuhlFQnI2fRDHQhTlkHMz8bEn0jTI6LJU0mpw=
