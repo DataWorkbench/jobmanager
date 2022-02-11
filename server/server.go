@@ -46,7 +46,6 @@ func Start() (err error) {
 		tracerCloser    io.Closer
 		spaceManageConn *grpcwrap.ClientConn
 		resourceConn    *grpcwrap.ClientConn
-		udfConn         *grpcwrap.ClientConn
 		engineClient    utils.ClusterManagerClient
 		resourceClient  utils.ResourceClient
 		udfClient       utils.UdfClient
@@ -92,11 +91,7 @@ func Start() (err error) {
 		return
 	}
 
-	if udfConn, err = grpcwrap.NewConn(ctx, cfg.UdfManagerServer); err != nil {
-		return
-	}
-
-	if udfClient, err = utils.NewUdfClient(udfConn); err != nil {
+	if udfClient, err = utils.NewUdfClient(spaceManageConn); err != nil {
 		return
 	}
 

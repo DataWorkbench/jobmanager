@@ -4,29 +4,29 @@ import (
 	"context"
 
 	"github.com/DataWorkbench/common/grpcwrap"
-	"github.com/DataWorkbench/gproto/xgo/service/pbsvcudf"
+	"github.com/DataWorkbench/gproto/xgo/service/pbsvcspace"
 	"github.com/DataWorkbench/gproto/xgo/types/pbmodel"
 	"github.com/DataWorkbench/gproto/xgo/types/pbrequest"
 	"github.com/DataWorkbench/gproto/xgo/types/pbresponse"
 )
 
 type UdfClient struct {
-	client pbsvcudf.UdfManageClient
+	client pbsvcspace.UDFManageClient
 }
 
 func NewUdfClient(conn *grpcwrap.ClientConn) (c UdfClient, err error) {
-	c.client = pbsvcudf.NewUdfManageClient(conn)
+	c.client = pbsvcspace.NewUDFManageClient(conn)
 	return c, nil
 }
 
-func (s *UdfClient) DescribeUdfManager(ctx context.Context, ID string) (udfLanguage pbmodel.UDFInfo_Language, name string, define string, err error) {
+func (s *UdfClient) DescribeUdfManager(ctx context.Context, ID string) (udfLanguage pbmodel.UDF_Language, name string, define string, err error) {
 	var (
 		req  pbrequest.DescribeUDF
 		resp *pbresponse.DescribeUDF
 	)
 
 	req.UdfId = ID
-	resp, err = s.client.Describe(ctx, &req)
+	resp, err = s.client.DescribeUDF(ctx, &req)
 	if err != nil {
 		return
 	}

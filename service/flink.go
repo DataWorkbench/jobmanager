@@ -43,7 +43,7 @@ type FlinkExecutor struct {
 }
 
 type Udf struct {
-	udfType pbmodel.UDFInfo_Language
+	udfType pbmodel.UDF_Language
 	code    string
 }
 
@@ -569,7 +569,7 @@ func (exec *FlinkExecutor) getUDFs(ctx context.Context, udfIds []string) ([]*Udf
 	var udfCodes []*Udf
 	for _, udfId := range udfIds {
 		var (
-			udfLanguage pbmodel.UDFInfo_Language
+			udfLanguage pbmodel.UDF_Language
 			udfDefine   string
 			udfName     string
 		)
@@ -578,7 +578,7 @@ func (exec *FlinkExecutor) getUDFs(ctx context.Context, udfIds []string) ([]*Udf
 			return nil, err
 		}
 
-		if udfLanguage != pbmodel.UDFInfo_Java {
+		if udfLanguage != pbmodel.UDF_Java {
 			udfDefine = strings.Replace(udfDefine, UDFQuote, udfName, -1)
 		}
 		udf := Udf{
@@ -593,7 +593,7 @@ func (exec *FlinkExecutor) getUDFs(ctx context.Context, udfIds []string) ([]*Udf
 func (exec *FlinkExecutor) getUDFJars(spaceId string, udfs []*Udf) string {
 	builder := strings.Builder{}
 	for _, udf := range udfs {
-		if udf.udfType == pbmodel.UDFInfo_Java {
+		if udf.udfType == pbmodel.UDF_Java {
 			builder.WriteString("hdfs://hdfs-k8s/" + spaceId + "/" + udf.code + ".jar,")
 		}
 	}
@@ -610,7 +610,7 @@ func (exec *FlinkExecutor) registerUDF(ctx context.Context, noteId string, udfs 
 	var err error
 	for _, udf := range udfs {
 		switch udf.udfType {
-		case pbmodel.UDFInfo_Scala:
+		case pbmodel.UDF_Scala:
 			if result, err = exec.zeppelinClient.Submit(ctx, "flink", "", noteId, udf.code); err != nil {
 				return nil, err
 			}
@@ -624,7 +624,7 @@ func (exec *FlinkExecutor) registerUDF(ctx context.Context, noteId string, udfs 
 				}
 				time.Sleep(time.Second * 2)
 			}
-		case pbmodel.UDFInfo_Python:
+		case pbmodel.UDF_Python:
 			if result, err = exec.zeppelinClient.Submit(ctx, "flink", "ipyflink", noteId, udf.code); err != nil {
 				return nil, err
 			}

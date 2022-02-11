@@ -29,10 +29,10 @@ type Config struct {
 	ZeppelinAddress       string                 `json:"zeppelin_address"      yaml:"zeppelin_address"      env:"ZEPPELIN_ADDRESS" validate:"required"`
 	ResourceManagerServer *grpcwrap.ClientConfig `json:"resourcemanager_server"      yaml:"resourcemanager_server"      env:"RESOURCEMANAGER_SERVER" validate:"required"`
 	//EngineManagerServer   *grpcwrap.ClientConfig `json:"enginemanager_server"      yaml:"enginemanager_server"      env:"ENGINEMANAGER_SERVER" validate:"required"`
-	UdfManagerServer *grpcwrap.ClientConfig `json:"udfmanager_server"      yaml:"udfmanager_server"      env:"UDFMANAGER_SERVER" validate:"required"`
-	GRPCServer       *grpcwrap.ServerConfig `json:"grpc_server"    yaml:"grpc_server"    env:"GRPC_SERVER"         validate:"required"`
-	MetricsServer    *metrics.Config        `json:"metrics_server" yaml:"metrics_server" env:"METRICS_SERVER"      validate:"required"`
-	MySQL            *gormwrap.MySQLConfig  `json:"mysql"          yaml:"mysql"          env:"MYSQL"               validate:"required"`
+	//UdfManagerServer *grpcwrap.ClientConfig `json:"udfmanager_server"      yaml:"udfmanager_server"      env:"UDFMANAGER_SERVER" validate:"required"`
+	GRPCServer    *grpcwrap.ServerConfig `json:"grpc_server"    yaml:"grpc_server"    env:"GRPC_SERVER"         validate:"required"`
+	MetricsServer *metrics.Config        `json:"metrics_server" yaml:"metrics_server" env:"METRICS_SERVER"      validate:"required"`
+	MySQL         *gormwrap.MySQLConfig  `json:"mysql"          yaml:"mysql"          env:"MYSQL"               validate:"required"`
 	//ETCD                  *getcd.Config          `json:"etcd"           yaml:"etcd"           env:"ETCD"                validate:"required"`
 	Tracer       *gtrace.Config         `json:"tracer"         yaml:"tracer"         env:"TRACER"              validate:"required"`
 	SpaceManager *grpcwrap.ClientConfig `json:"space_manager"  yaml:"space_manager"  env:"SPACE_MANAGER"       validate:"required"`
