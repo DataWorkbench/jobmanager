@@ -30,7 +30,7 @@ func (s *UdfClient) DescribeUdfManager(ctx context.Context, ID string) (udfLangu
 	if err != nil {
 		return
 	}
-	udfLanguage = resp.Info.GetUdfLanguage()
+	udfLanguage = resp.Info.Language
 	name = resp.Info.GetName()
 	define = resp.Info.GetDefine()
 

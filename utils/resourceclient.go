@@ -26,6 +26,6 @@ func (s *ResourceClient) GetFileById(ctx context.Context, id string) (name strin
 		return
 	}
 	name = reply.Info.Name
-	url = constants.GenResourceFilePath(reply.Info.SpaceId, reply.Info.ResourceId, reply.Info.Version)
+	url = constants.GenResourceFilePath(reply.Info.SpaceId, reply.Info.Id, reply.Info.Version)
 	return
 }
