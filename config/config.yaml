@@ -42,10 +42,10 @@ tracer:
 #  log_level: 2
 #  log_verbosity: 99
 
-resourcemanager_server:
-  address: "127.0.0.1:9111"
-  log_level: 2
-  log_verbosity: 99
+#resourcemanager_server:
+#  address: "127.0.0.1:9111"
+#  log_level: 2
+#  log_verbosity: 99
 
 space_manager:
   address: "127.0.0.1:9101"

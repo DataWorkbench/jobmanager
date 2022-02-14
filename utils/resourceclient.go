@@ -3,27 +3,29 @@ package utils
 import (
 	"context"
 
+	"github.com/DataWorkbench/common/constants"
 	"github.com/DataWorkbench/common/grpcwrap"
-	"github.com/DataWorkbench/gproto/xgo/service/pbsvcresource"
+	"github.com/DataWorkbench/gproto/xgo/service/pbsvcspace"
 	"github.com/DataWorkbench/gproto/xgo/types/pbrequest"
+	"github.com/DataWorkbench/gproto/xgo/types/pbresponse"
 )
 
 type ResourceClient struct {
-	client pbsvcresource.ResourceManageClient
+	client pbsvcspace.ResourceMetaClient
 }
 
 func NewResourceClient(conn *grpcwrap.ClientConn) (c ResourceClient, err error) {
-	c.client = pbsvcresource.NewResourceManageClient(conn)
+	c.client = pbsvcspace.NewResourceMetaClient(conn)
 	return c, nil
 }
 
 func (s *ResourceClient) GetFileById(ctx context.Context, id string) (name string, url string, err error) {
-	res, err := s.client.DescribeFile(ctx, &pbrequest.DescribeFile{ResourceId: id})
+	var reply *pbresponse.DescribeFileMeta
+	reply, err = s.client.DescribeFileMeta(ctx, &pbrequest.DescribeFileMeta{ResourceId: id})
 	if err != nil {
 		return
 	}
-	name = res.Name
-	spaceId := res.SpaceId
-	url = "/" + spaceId + "/" + id + ".jar"
+	name = reply.Info.Name
+	url = constants.GenResourceFilePath(reply.Info.SpaceId, reply.Info.ResourceId, reply.Info.Version)
 	return
 }
