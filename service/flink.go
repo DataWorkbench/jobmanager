@@ -283,7 +283,7 @@ func (exec *FlinkExecutor) initJar(ctx context.Context, req *pbrequest.InitFlink
 	flinkHome := constants.FlinkClientHome[flinkVersion]
 	runBuilder.WriteString("%sh ")
 	runBuilder.WriteString(fmt.Sprintf("%s/bin/flink run -d -m %s", flinkHome, flinkUrl))
-	jarName, jarUrl, err := exec.resourceClient.GetFileById(ctx, req.GetCode().GetJar().GetResourceId())
+	jarName, jarUrl, err := exec.resourceClient.GetFileById(ctx, req.GetCode().GetJar().FileId)
 	if err != nil {
 		return "", "", nil, err
 	}
