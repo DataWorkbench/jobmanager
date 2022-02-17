@@ -443,11 +443,14 @@ func (exec *FlinkExecutor) runJar(ctx context.Context, instanceId string, noteId
 func (exec *FlinkExecutor) transResult(result *zeppelin.ParagraphResult) (string, pbmodel.StreamInstance_State) {
 	var data string
 	var status pbmodel.StreamInstance_State
+	sb := strings.Builder{}
 	for _, re := range result.Results {
 		if strings.EqualFold("TEXT", re.Type) {
-			data = re.Data
+			sb.WriteString(re.Data)
+			sb.WriteString("\n")
 		}
 	}
+	data = sb.String()
 	switch result.Status {
 	case zeppelin.RUNNING, zeppelin.FINISHED:
 		status = pbmodel.StreamInstance_Running
