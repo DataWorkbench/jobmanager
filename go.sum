@@ -362,7 +362,6 @@ github.com/yu31/dqueue v0.0.0-20220109113339-2dc95440c13c/go.mod h1:VvTk7r7w2dUN
 github.com/yu31/gcron v0.0.0-20220109164512-f4b84f672fef h1:T0gr9qfea07R2S9E3EVzWsJRuZHYjXCcGmtWTRjITfU=
 github.com/yu31/gcron v0.0.0-20220109164512-f4b84f672fef/go.mod h1:jW6Lqn5d71rdpbAC198RuOCjuSMq9XeGLmueQe6HIXY=
 github.com/yu31/gostructs v0.0.0-20220107115217-dc0130426169/go.mod h1:2nxYgIcGxEN5nRc3n3pRusl7ys+oEM14uInKe+WtouQ=
-github.com/yu31/protoc-plugin v0.0.0-20220203110934-7f035b2a8f28 h1:XMNeN4NwxM1zGDndKCaM0OKs6mJ+mXNO+0UDOvKp460=
 github.com/yu31/protoc-plugin v0.0.0-20220203110934-7f035b2a8f28/go.mod h1:9OjgxZBT7i/e4V7OAubCmFXzlw2Llde6WF+PbHla2HY=
 github.com/yu31/protoc-plugin v0.0.0-20220204051042-6ae48e54d91b h1:l/Ie0G9t3FdxwaDVlLI8mFZM1HjpaIa7eexg/Z5Bnl8=
 github.com/yu31/protoc-plugin v0.0.0-20220204051042-6ae48e54d91b/go.mod h1:9OjgxZBT7i/e4V7OAubCmFXzlw2Llde6WF+PbHla2HY=
@@ -576,7 +575,6 @@ google.golang.org/grpc v1.27.0/go.mod h1:qbnxyOmOxrQa7FizSgH+ReBfzJrCY1pSN7KXBS8
 google.golang.org/grpc v1.29.1/go.mod h1:itym6AZVZYACWQqET3MqgPpjcuV5QH3BxFS3IjizoKk=
 google.golang.org/grpc v1.33.1/go.mod h1:fr5YgcSWrqhRRxogOsw7RzIpsmvOZ6IcH4kBYTpR3n0=
 google.golang.org/grpc v1.36.0/go.mod h1:qjiiYl8FncCW8feJPdyg3v6XW24KsRHe+dy9BAGRRjU=
-google.golang.org/grpc v1.38.0 h1:/9BgsAsa5nWe26HqOlvlgJnqBuktYOLCgjCPqsa56W0=
 google.golang.org/grpc v1.38.0/go.mod h1:NREThFqKR1f3iQ6oBuvc5LadQuXVGo9rkm5ZGrQdJfM=
 google.golang.org/grpc v1.43.0/go.mod h1:k+4IHHFw41K8+bbowsex27ge2rCb65oeWqe4jJ590SU=
 google.golang.org/grpc v1.44.0 h1:weqSxi/TMs1SqFRMHCtBgXRs8k3X39QIDEZ0pRcttUg=

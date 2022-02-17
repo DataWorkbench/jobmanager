@@ -290,7 +290,10 @@ func (exec *FlinkExecutor) initJar(ctx context.Context, req *pbrequest.InitFlink
 	initBuilder := strings.Builder{}
 	localJarPath := "/tmp/" + jarName
 	initBuilder.WriteString(fmt.Sprintf("hdfs dfs -get %v %v\n", jarUrl, localJarPath))
-	udfJars := exec.getUDFJars(req.GetSpaceId(), udfs)
+	udfJars, err := exec.getUDFJars(ctx, udfs)
+	if err != nil {
+		return "", "", nil, err
+	}
 	logger.Info().Msg(fmt.Sprintf("jar's udfJars is %s", udfJars))
 	for index, udf := range strings.Split(udfJars, ",") {
 		if len(udf) == 20 {
@@ -553,16 +556,20 @@ func (exec *FlinkExecutor) getBaseConnectors(builtInConnectors []string, flinkVe
 	return executeJars
 }
 
-func (exec *FlinkExecutor) getUserDefineConnectors(spaceId string, resIds []string) string {
+func (exec *FlinkExecutor) getUserDefineConnectors(ctx context.Context, resIds []string) (string, error) {
 	builder := strings.Builder{}
 	for _, id := range resIds {
-		builder.WriteString("hdfs://hdfs-k8s/" + spaceId + "/" + id + ".jar,")
+		_, url, err := exec.resourceClient.GetFileById(ctx, id)
+		if err != nil {
+			return "", err
+		}
+		builder.WriteString(url + ",")
 	}
 	executeJars := builder.String()
 	if executeJars != "" && len(executeJars) > 0 {
 		executeJars = strings.TrimSuffix(executeJars, ",")
 	}
-	return executeJars
+	return executeJars, nil
 }
 
 func (exec *FlinkExecutor) getUDFs(ctx context.Context, udfIds []string) ([]*Udf, error) {
@@ -590,18 +597,22 @@ func (exec *FlinkExecutor) getUDFs(ctx context.Context, udfIds []string) ([]*Udf
 	return udfCodes, nil
 }
 
-func (exec *FlinkExecutor) getUDFJars(spaceId string, udfs []*Udf) string {
+func (exec *FlinkExecutor) getUDFJars(ctx context.Context, udfs []*Udf) (string, error) {
 	builder := strings.Builder{}
 	for _, udf := range udfs {
 		if udf.udfType == pbmodel.UDF_Java {
-			builder.WriteString("hdfs://hdfs-k8s/" + spaceId + "/" + udf.code + ".jar,")
+			_, url, err := exec.resourceClient.GetFileById(ctx, udf.code)
+			if err != nil {
+				return "", err
+			}
+			builder.WriteString(url + ",")
 		}
 	}
 	udfJars := builder.String()
 	if udfJars != "" && len(udfJars) > 0 {
 		udfJars = strings.TrimSuffix(udfJars, ",")
 	}
-	return udfJars
+	return udfJars, nil
 }
 
 func (exec *FlinkExecutor) registerUDF(ctx context.Context, noteId string, udfs []*Udf) (*zeppelin.ParagraphResult, error) {
@@ -686,7 +697,10 @@ func (exec *FlinkExecutor) getGlobalProperties(ctx context.Context, info *pbrequ
 
 	var executionJars string
 	baseConnectors := exec.getBaseConnectors(info.GetArgs().GetBuiltInConnectors(), flinkVersion)
-	userConnectors := exec.getUserDefineConnectors(info.SpaceId, info.GetArgs().GetConnectors())
+	userConnectors, err := exec.getUserDefineConnectors(ctx, info.GetArgs().GetConnectors())
+	if err != nil {
+		return nil, err
+	}
 	if baseConnectors != "" && len(baseConnectors) > 0 {
 		executionJars = baseConnectors + "," + userConnectors
 	} else if userConnectors != "" && len(userConnectors) > 0 {
@@ -696,7 +710,10 @@ func (exec *FlinkExecutor) getGlobalProperties(ctx context.Context, info *pbrequ
 		properties["flink.execution.jars"] = executionJars
 	}
 
-	udfJars := exec.getUDFJars(info.GetSpaceId(), udfs)
+	udfJars, err := exec.getUDFJars(ctx, udfs)
+	if err != nil {
+		return nil, err
+	}
 	if udfJars != "" && len(udfJars) > 0 {
 		properties["flink.udf.jars"] = udfJars
 	}
