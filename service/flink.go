@@ -566,7 +566,7 @@ func (exec *FlinkExecutor) getUserDefineConnectors(ctx context.Context, resIds [
 		if err != nil {
 			return "", err
 		}
-		builder.WriteString(url + ",")
+		builder.WriteString("hdfs://"+url + ",")
 	}
 	executeJars := builder.String()
 	if executeJars != "" && len(executeJars) > 0 {
@@ -608,7 +608,7 @@ func (exec *FlinkExecutor) getUDFJars(ctx context.Context, udfs []*Udf) (string,
 			if err != nil {
 				return "", err
 			}
-			builder.WriteString(url + ",")
+			builder.WriteString("hdfs://"+url + ",")
 		}
 	}
 	udfJars := builder.String()
