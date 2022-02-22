@@ -19,7 +19,7 @@ func NewUdfClient(conn *grpcwrap.ClientConn) (c UdfClient, err error) {
 	return c, nil
 }
 
-func (s *UdfClient) DescribeUdfManager(ctx context.Context, ID string) (udfLanguage pbmodel.UDF_Language, name string, define string, err error) {
+func (s *UdfClient) DescribeUdfInfo(ctx context.Context, ID string) (udfLanguage pbmodel.UDF_Language, name string, code string, fileId string, err error) {
 	var (
 		req  pbrequest.DescribeUDF
 		resp *pbresponse.DescribeUDF
@@ -31,8 +31,9 @@ func (s *UdfClient) DescribeUdfManager(ctx context.Context, ID string) (udfLangu
 		return
 	}
 	udfLanguage = resp.Info.Language
-	name = resp.Info.GetName()
-	define = resp.Info.GetDefine()
+	name = resp.Info.Name
+	fileId = resp.Info.FileId
+	code = resp.Info.Code
 
 	return
 }

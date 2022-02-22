@@ -44,7 +44,8 @@ type FlinkExecutor struct {
 
 type Udf struct {
 	udfType pbmodel.UDF_Language
-	code    string
+	udfCode string
+	fileId  string
 }
 
 func NewFlinkExecutor(ctx context.Context, db *gorm.DB, engineClient utils.ClusterManagerClient, udfClient utils.UdfClient, resourceClient utils.ResourceClient,
@@ -566,7 +567,7 @@ func (exec *FlinkExecutor) getUserDefineConnectors(ctx context.Context, resIds [
 		if err != nil {
 			return "", err
 		}
-		builder.WriteString("hdfs://"+url + ",")
+		builder.WriteString("hdfs://" + url + ",")
 	}
 	executeJars := builder.String()
 	if executeJars != "" && len(executeJars) > 0 {
@@ -578,22 +579,18 @@ func (exec *FlinkExecutor) getUserDefineConnectors(ctx context.Context, resIds [
 func (exec *FlinkExecutor) getUDFs(ctx context.Context, udfIds []string) ([]*Udf, error) {
 	var udfCodes []*Udf
 	for _, udfId := range udfIds {
-		var (
-			udfLanguage pbmodel.UDF_Language
-			udfDefine   string
-			udfName     string
-		)
-		udfLanguage, udfName, udfDefine, err := exec.udfClient.DescribeUdfManager(ctx, udfId)
+		udfLanguage, udfName, udfCode, udfFileId, err := exec.udfClient.DescribeUdfInfo(ctx, udfId)
 		if err != nil {
 			return nil, err
 		}
 
 		if udfLanguage != pbmodel.UDF_Java {
-			udfDefine = strings.Replace(udfDefine, UDFQuote, udfName, -1)
+			udfCode = strings.Replace(udfCode, UDFQuote, udfName, -1)
 		}
 		udf := Udf{
 			udfType: udfLanguage,
-			code:    udfDefine,
+			udfCode: udfCode,
+			fileId:  udfFileId,
 		}
 		udfCodes = append(udfCodes, &udf)
 	}
@@ -604,11 +601,11 @@ func (exec *FlinkExecutor) getUDFJars(ctx context.Context, udfs []*Udf) (string,
 	builder := strings.Builder{}
 	for _, udf := range udfs {
 		if udf.udfType == pbmodel.UDF_Java {
-			_, url, err := exec.resourceClient.GetFileById(ctx, udf.code)
+			_, url, err := exec.resourceClient.GetFileById(ctx, udf.fileId)
 			if err != nil {
 				return "", err
 			}
-			builder.WriteString("hdfs://"+url + ",")
+			builder.WriteString("hdfs://" + url + ",")
 		}
 	}
 	udfJars := builder.String()
@@ -625,7 +622,7 @@ func (exec *FlinkExecutor) registerUDF(ctx context.Context, noteId string, udfs 
 	for _, udf := range udfs {
 		switch udf.udfType {
 		case pbmodel.UDF_Scala:
-			if result, err = exec.zeppelinClient.Submit(ctx, "flink", "", noteId, udf.code); err != nil {
+			if result, err = exec.zeppelinClient.Submit(ctx, "flink", "", noteId, udf.udfCode); err != nil {
 				return nil, err
 			}
 			start := time.Now().Unix()
@@ -639,7 +636,7 @@ func (exec *FlinkExecutor) registerUDF(ctx context.Context, noteId string, udfs 
 				time.Sleep(time.Second * 2)
 			}
 		case pbmodel.UDF_Python:
-			if result, err = exec.zeppelinClient.Submit(ctx, "flink", "ipyflink", noteId, udf.code); err != nil {
+			if result, err = exec.zeppelinClient.Submit(ctx, "flink", "ipyflink", noteId, udf.udfCode); err != nil {
 				return nil, err
 			}
 			start := time.Now().Unix()
